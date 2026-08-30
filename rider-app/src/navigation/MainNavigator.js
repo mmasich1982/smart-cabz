@@ -51,53 +51,7 @@ import AddOtherExpenseScreen from '../screens/financialPerformance/AddOtherExpen
 import YesterdayNetProfitScreen from '../screens/financialPerformance/YesterdayNetProfitScreen';
 
 // ============================================================================
-// TILE 4: MY REVENUE TARGETS
-// ============================================================================
-import RevenueTargetsScreen from '../screens/revenueTargets/RevenueTargetsScreen';
-import SetTargetScreen from '../screens/revenueTargets/SetTargetScreen';
-
-// ============================================================================
-// TILE 5: MY LICENSE AND INSURANCE
-// ============================================================================
-import ComplianceDashboardScreen from '../screens/compliance/ComplianceDashboardScreen';
-import AddDocumentScreen from '../screens/compliance/AddDocumentScreen';
-import RenewDocumentScreen from '../screens/compliance/RenewDocumentScreen';
-
-// ============================================================================
-// TILE 6: MY SAVINGS
-// ============================================================================
-import SavingsHubScreen from '../screens/savings/SavingsHubScreen';
-import SavingsEntryScreen from '../screens/savings/SavingsEntryScreen';
-import SavingsTypeListScreen from '../screens/savings/SavingsTypeListScreen';
-import AddSavingsContributionScreen from '../screens/savings/AddSavingsContributionScreen';
-import SavingsReportScreen from '../screens/savings/SavingsReportScreen';
-import SavingsAccountScreen from '../screens/savings/SavingsAccountScreen';
-
-// ============================================================================
-// TILE 7: LIPA LATER CUSTOMER REPORT
-// ============================================================================
-import LipaLaterCustomersScreen from '../screens/lipaLater/LipaLaterCustomersScreen';
-import PaymentSummaryScreen from '../screens/lipaLater/PaymentSummaryScreen';
-import LipaLaterDetailsScreen from '../screens/lipaLater/LipaLaterDetailsScreen';
-import RecordPaymentScreen from '../screens/lipaLater/RecordPaymentScreen';
-import LipaLaterAgeingScreen from '../screens/lipaLater/LipaLaterAgeingScreen';
-
-// ============================================================================
-// TILE 8: SEND MONEY HOME
-// ============================================================================
-import SendMoneyHomeScreen from '../screens/sendHome/SendMoneyHomeScreen';
-import SendMoneyHistoryScreen from '../screens/sendHome/SendMoneyHistoryScreen';
-
-// ============================================================================
-// TILE 9: MY GOALS
-// ============================================================================
-// ✓ FIXED: Changed GoalSummaryScreen → GoalDetailScreen
-import { MyGoalsScreen, NewGoalScreen, GoalDetailScreen } from '../screens/goals/GoalsScreen';
-import GoalAchievedScreen from '../screens/goals/GoalAchievedScreen';
-import LogContributionScreen from '../screens/goals/LogContributionScreen';
-
-// ============================================================================
-// TILE 10: MY SUBSCRIPTION
+// TILE 4: MY SUBSCRIPTION
 // ============================================================================
 import SubscriptionScreen from '../screens/subscription/SubscriptionScreen';
 import FrequencySelectScreen from '../screens/subscription/FrequencySelectScreen';
@@ -106,18 +60,9 @@ import PaymentHistoryScreen from '../screens/subscription/PaymentHistoryScreen';
 import SubscriptionBanners from '../screens/subscription/SubscriptionBanners';
 import ConfirmSubscriptionScreen from '../screens/subscription/ConfirmSubscriptionScreen';
 
-// ============================================================================
-// TILE 11: SUGGESTIONS AND FEEDBACK
-// ============================================================================
-import SuggestionsFeedbackScreen from '../screens/suggestionsFeedback/SuggestionsFeedbackScreen';
 
 // ============================================================================
-// TILE 12: SYNC STATUS
-// ============================================================================
-import SyncQueueScreen from '../screens/SyncQueueScreen';
-
-// ============================================================================
-// TILE 14: MY DAILY TRADE SUMMARY
+// TILE 5: MY DAILY TRADE SUMMARY
 // ============================================================================
 import DailyTradeSummaryScreen from '../screens/trips/DailyTradeSummaryScreen';
 import NewTripScreen from '../screens/trips/NewTripScreen';
@@ -134,28 +79,13 @@ import GenerateStatementScreen from '../screens/financialHistory/GenerateStateme
 import StatementPreviewScreen from '../screens/financialHistory/StatementPreviewScreen';
 import TransactionListScreen from '../screens/financialHistory/TransactionListScreen';
 import StatementHistoryScreen from '../screens/financialHistory/StatementHistoryScreen';
-import DataExportRequestScreen from '../screens/financialHistory/DataExportRequestScreen';
 
 // ============================================================================
-// TILE 16: MY SETTINGS & BIKE PROFILE
-// ============================================================================
-import SettingsScreen from '../screens/settings/SettingsScreen';
-
-
-// ============================================================================
-// AUTHENTICATIIN SCREENS
+// AUTHENTICATION SCREENS
 // ============================================================================
 import PinLoginScreen from '../screens/auth/PinLoginScreen';
 import ChangePinVerifyScreen from '../screens/auth/ChangePinVerifyScreen';
 
-
-// ============================================================================
-// SUPPORTING SCREENS
-// ============================================================================
-import ProfileConfirmationScreen from '../screens/onboarding/ProfileConfirmationScreen';
-import TermsOfServiceScreen from '../screens/settings/TermsOfServiceScreen';
-import DataPrivacyScreen from '../screens/settings/DataPrivacyScreen';
-import LegalDocumentScreen from '../screens/settings/LegalDocumentScreen';
 
 const Stack = createNativeStackNavigator();
 
