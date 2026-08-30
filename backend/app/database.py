@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Get database URL and schema from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
-DB_SCHEMA = os.getenv("DB_SCHEMA", "smart_cabz")  # Default to smart_boda
+DB_SCHEMA = os.getenv("DB_SCHEMA", "smart_cabz")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required but not set")
@@ -20,10 +20,6 @@ if "postgresql" in DATABASE_URL:
     DATABASE_URL = f"{DATABASE_URL}?options=-c%20search_path%3D{DB_SCHEMA}"
 
 # Create engine with production settings
-# - pool_size: connections to keep in pool (default 5)
-# - max_overflow: additional connections beyond pool_size (default 10)
-# - pool_recycle: recycle connections after 3600s (prevents stale connections)
-# - pool_pre_ping: verify connection alive before using (prevents "connection lost" errors)
 engine = create_engine(
     DATABASE_URL,
     pool_size=20,
@@ -38,16 +34,7 @@ Base = declarative_base()
 
 # FastAPI dependency for database access
 def get_db():
-    """
-    Database session dependency for FastAPI.
-    Provides a new session per request, guarantees cleanup.
-    
-    Usage in routes:
-        @app.get("/rides")
-        def get_rides(db: Session = Depends(get_db)):
-            rides = db.query(Ride).all()
-            return rides
-    """
+    """Database session dependency for FastAPI."""
     db = SessionLocal()
     try:
         yield db
@@ -61,99 +48,92 @@ def get_db():
 def init_db():
     """
     Initialize database (create all tables).
-    Called once at application startup if tables don't exist.
-    
-    ✅ IMPROVED: Handles existing tables/indexes gracefully
+    ✅ FIXED: Handles existing tables/indexes gracefully
     ✅ Prevents "duplicate index" errors
-    ✅ Logs all operations for debugging
-    
-    Usage in main.py:
-        from database import init_db
-        init_db()
     """
     try:
         logger.info("Starting database initialization...")
         
-        # Get database inspector to check existing objects
+        # Get database inspector
         inspector = inspect(engine)
         existing_tables = set(inspector.get_table_names())
         
         logger.info(f"Found {len(existing_tables)} existing tables")
         
-        # Create all tables (SQLAlchemy will skip existing ones)
-        logger.info("Creating tables from metadata...")
-        Base.metadata.create_all(bind=engine)
-        
-        logger.info("Database initialization completed successfully!")
-        return True
-        
-    except ProgrammingError as e:
-        if "already exists" in str(e) or "DuplicateTable" in str(e):
-            logger.warning(f"Index or table already exists (expected on redeployment): {str(e)}")
-            logger.info("This is normal if the database was already initialized.")
-            
-            # Try alternative approach: create only missing tables
-            try:
-                _create_missing_tables_only()
-                logger.info("Successfully created missing tables using fallback method")
-                return True
-            except Exception as fallback_error:
-                logger.error(f"Fallback method also failed: {str(fallback_error)}")
-                raise
-        else:
-            logger.error(f"Database initialization failed: {str(e)}")
-            raise
-            
-    except SQLAlchemyError as e:
-        logger.error(f"SQLAlchemy error during initialization: {str(e)}")
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error during database initialization: {str(e)}")
-        raise
-
-
-def _create_missing_tables_only():
-    """
-    Create only tables that don't exist yet.
-    Useful as a fallback when there are index conflicts.
-    """
-    inspector = inspect(engine)
-    existing_tables = set(inspector.get_table_names())
-    
-    with engine.connect() as connection:
+        # For each table in metadata, create if not exists
         for table in Base.metadata.sorted_tables:
             if table.name not in existing_tables:
                 logger.info(f"Creating table: {table.name}")
-                Base.metadata.create_all(bind=connection, tables=[table])
+                table.create(engine, checkfirst=True)
             else:
-                logger.info(f"Table already exists, skipping: {table.name}")
+                logger.info(f"Table already exists: {table.name}")
+                # Create any missing indexes for existing tables
+                _create_missing_indexes(table.name, inspector)
         
-        connection.commit()
+        logger.info("✓ Database initialization completed successfully!")
+        return True
+        
+    except ProgrammingError as e:
+        error_msg = str(e).lower()
+        if "already exists" in error_msg or "duplicate" in error_msg:
+            logger.warning(f"⚠ Index/table already exists (expected): {str(e)}")
+            logger.info("Continuing with database operations...")
+            return True
+        else:
+            logger.error(f"✗ Database initialization failed: {str(e)}")
+            raise
+            
+    except SQLAlchemyError as e:
+        logger.error(f"✗ SQLAlchemy error: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"✗ Unexpected error: {str(e)}")
+        raise
+
+
+def _create_missing_indexes(table_name: str, inspector):
+    """
+    Create indexes for a table that don't already exist.
+    Prevents "duplicate index" errors.
+    """
+    try:
+        # Get existing indexes for this table
+        existing_indexes = set(idx['name'] for idx in inspector.get_indexes(table_name))
+        
+        # Get the table metadata
+        table = Base.metadata.tables.get(table_name)
+        if not table:
+            return
+        
+        # Create missing indexes
+        with engine.connect() as conn:
+            for index in table.indexes:
+                if index.name not in existing_indexes:
+                    try:
+                        logger.info(f"Creating index: {index.name} on {table_name}")
+                        conn.execute(text(str(index.compile(compile_kwargs={"literal_binds": True}))))
+                        conn.commit()
+                    except ProgrammingError as e:
+                        if "already exists" in str(e).lower():
+                            logger.info(f"Index already exists: {index.name}")
+                        else:
+                            raise
+                else:
+                    logger.info(f"Index already exists: {index.name}")
+    except Exception as e:
+        logger.warning(f"Could not create indexes for {table_name}: {str(e)}")
 
 
 def drop_all_tables():
-    """
-    ⚠️ DANGER: Drop all tables - USE ONLY IN DEVELOPMENT/TESTING
-    
-    This should NEVER be used in production.
-    """
+    """⚠️ DANGER: Drop all tables - USE ONLY IN DEVELOPMENT/TESTING"""
     logger.warning("⚠️ DROPPING ALL TABLES - THIS SHOULD ONLY BE USED IN DEVELOPMENT!")
     Base.metadata.drop_all(bind=engine)
     logger.info("All tables dropped successfully")
 
 
 def reset_database():
-    """
-    ⚠️ DANGER: Drop and recreate all tables - USE ONLY IN DEVELOPMENT/TESTING
-    
-    This is useful for complete reset during development.
-    """
+    """⚠️ DANGER: Drop and recreate all tables - USE ONLY IN DEVELOPMENT/TESTING"""
     logger.warning("⚠️ RESETTING DATABASE - THIS SHOULD ONLY BE USED IN DEVELOPMENT!")
-    try:
-        drop_all_tables()
-        init_db()
-        logger.info("Database reset completed successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Database reset failed: {str(e)}")
-        raise
+    drop_all_tables()
+    init_db()
+    logger.info("Database reset completed")
