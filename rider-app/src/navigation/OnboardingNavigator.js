@@ -23,10 +23,6 @@ import ProfileConfirmationScreen from '../screens/onboarding/ProfileConfirmation
 import CreatePinScreen from '../screens/onboarding/CreatePinScreen';
 
 
-// ✅ LEGAL SCREENS (correct paths)
-import TermsOfServiceScreen from '../screens/settings/TermsOfServiceScreen';
-import DataPrivacyScreen from '../screens/settings/DataPrivacyScreen';
-
 // ✅ CRITICAL FIX: Import PinLoginScreen from /auth/ path (NOT /onboarding/)
 // The /auth/ version has proper null-checking for route.params
 import PinLoginScreen from '../screens/auth/PinLoginScreen';
@@ -112,7 +108,7 @@ function LoadingScreen() {
         fontWeight: '600',
         marginBottom: 12,
       }}>
-        🏍️ Loading Smart Boda...
+        🏍️ Loading Smart Cabz...
       </Text>
       <Text style={{
         fontSize: 12,
@@ -178,7 +174,7 @@ function ErrorScreen({ error }) {
         fontWeight: '600',
         marginTop: 8,
       }}>
-        📞 +254 757 334481
+        📞 +254 101 605262
       </Text>
     </View>
   );
@@ -252,22 +248,8 @@ export default function OnboardingNavigator() {
           component={ForgotPinScreen} 
         />
         <Stack.Screen 
-          name="PinRecovery" 
-          component={PinRecoveryScreen} 
-        />
-        <Stack.Screen 
           name="ForgotPinConfirmation" 
           component={ForgotPinConfirmationScreen} 
-        />
-
-        {/* LEGAL & INFORMATION SCREENS */}
-        <Stack.Screen 
-          name="TermsOfService" 
-          component={TermsOfServiceScreen} 
-        />
-        <Stack.Screen 
-          name="DataPrivacy" 
-          component={DataPrivacyScreen} 
         />
 
         {/* ✅ CRITICAL: Screen name MUST be "Home" (not "MainApp") */}
