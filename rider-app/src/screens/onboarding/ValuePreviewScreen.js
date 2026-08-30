@@ -1,6 +1,6 @@
 // rider-app/src/screens/onboarding/ValuePreviewScreen.js
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
 import HeroBand from '../../components/HeroBand';
 import ProgressStatCard from '../../components/ProgressStatCard';
 import PrimaryButton from '../../components/PrimaryButton';
@@ -62,12 +62,12 @@ export default function ValuePreviewScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <HeroBand 
         onBack={handleBack} 
         eyebrow={t('preview.eyebrow') || '✨ A peek at what\'s waiting for you'}
         title={t('preview.title') || 'This Could Be Your Week 💰'}
-        subtitle={t('preview.subtitle') || 'This is what riders see every week, once their car is set up.'} 
+        subtitle={t('preview.subtitle') || 'This is what drivers see every week, once their cabz is set up.'} 
       />
 
       <View style={styles.contentContainer}>
@@ -86,12 +86,12 @@ export default function ValuePreviewScreen({ navigation }) {
       </View>
 
       <PrimaryButton 
-        label={t('preview.cta') || 'Set Up My Car Now →'}
+        label={t('preview.cta') || 'Set Up My Cabz Now →'}
         glow 
-        onPress={() => navigation.navigate('BikeProfile')} 
+        onPress={() => navigation.navigate('CabzProfile')} 
       />
       <CustomerCareFooter />
-    </View>
+    </ScrollView>
   );
 }
 

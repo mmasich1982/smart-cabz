@@ -32,7 +32,7 @@ export default function LanguageSelectionScreen({ navigation }) {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Per cleaned.html: Hero band with moto watermarks, NO branding header */}
       <HeroBand 
-        eyebrow="🤝 Riders all over Kenya use this app" 
+        eyebrow="🤝 Drivers all over Kenya use this app" 
         title="Karibu! Welcome 👋" 
         subtitle="Pick your language. It only takes one tap." 
       />

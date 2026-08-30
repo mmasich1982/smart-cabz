@@ -8,7 +8,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import PrimaryButton from '../../components/PrimaryButton';
 import { useTranslation } from '../../i18n/LocalizationProvider';
-import colors from '../../theme/colors';
 import api from '../../api/client';
 
 export default function DuplicatePlateScreen({ route, navigation }) {
@@ -46,12 +45,12 @@ export default function DuplicatePlateScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, padding: 24, backgroundColor: '#f6f4ef', alignItems: 'center', justifyContent: 'center' },
   icon: { fontSize: 44, marginBottom: 14 },
-  title: { fontSize: 20, fontWeight: '800', color: colors.ink, textAlign: 'center', marginBottom: 10 },
-  body: { fontSize: 14, color: colors.inkSoft, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-  card: { backgroundColor: colors.cream, borderRadius: 12, padding: 16, width: '100%', marginBottom: 20, alignItems: 'center' },
-  cardLabel: { fontSize: 11, color: colors.inkSoft, textTransform: 'uppercase' },
-  cardValue: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 4 },
-  reassure: { fontSize: 12.5, color: colors.signalGreen, textAlign: 'center', marginBottom: 24, lineHeight: 18 },
+  title: { fontSize: 20, fontWeight: '800', color: '#1a1c20', textAlign: 'center', marginBottom: 10 },
+  body: { fontSize: 14, color: '#5b606c', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  card: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, width: '100%', marginBottom: 20, alignItems: 'center', borderWidth: 1, borderColor: '#e7e4db' },
+  cardLabel: { fontSize: 11, color: '#5b606c', textTransform: 'uppercase' },
+  cardValue: { fontSize: 16, fontWeight: '700', color: '#1a1c20', marginTop: 4 },
+  reassure: { fontSize: 12.5, color: '#1e9e6f', textAlign: 'center', marginBottom: 24, lineHeight: 18 },
 });

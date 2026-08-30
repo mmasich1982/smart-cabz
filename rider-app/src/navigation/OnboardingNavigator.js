@@ -1,12 +1,15 @@
 // rider-app/src/navigation/OnboardingNavigator.js
 /**
- * ONBOARDING & AUTH NAVIGATOR - CORRECTED VERSION
- * ✅ FIXED: Import PinLoginScreen from /auth/ path (was /onboarding/)
+ * ONBOARDING & AUTH NAVIGATOR - SMART CABZ VERSION
+ * ✅ FIXED: Import CabzProfileScreen instead of BikeProfileScreen
+ * ✅ FIXED: Updated route name from "BikeProfile" to "CabzProfile"
+ * ✅ FIXED: Updated onboarding step mapping to use "cabzProfile"
  * ✅ PRESERVED: Original structure with "Home" screen name
  * ✅ ADDED: Loading/error handling for initialization
+ * ✅ UPDATED: Smart Cabz branding throughout
  * 
- * KEY FIX: This version imports from the CORRECT PinLoginScreen path
- * which has proper route.params null-checking to prevent blank pages
+ * KEY FIX: This version imports from the CORRECT paths and uses CabzProfileScreen
+ * which maintains proper route.params null-checking to prevent blank pages
  */
 
 import React from 'react';
@@ -17,7 +20,7 @@ import { View, Text } from 'react-native';
 // ✅ ORIGINAL ONBOARDING SCREENS (correct paths)
 import LanguageSelectionScreen from '../screens/onboarding/LanguageSelectionScreen';
 import ValuePreviewScreen from '../screens/onboarding/ValuePreviewScreen';
-import BikeProfileScreen from '../screens/onboarding/BikeProfileScreen';
+import CabzProfileScreen from '../screens/onboarding/CabzProfileScreen';
 import MobileNumberScreen from '../screens/onboarding/MobileNumberScreen';
 import ProfileConfirmationScreen from '../screens/onboarding/ProfileConfirmationScreen';
 import CreatePinScreen from '../screens/onboarding/CreatePinScreen';
@@ -43,7 +46,7 @@ const Stack = createNativeStackNavigator();
  * INITIALIZATION LOGIC
  * Determines which screen to show on cold start:
  * 1. LanguageSelection - first time ever
- * 2. PinLogin - returning registered rider
+ * 2. PinLogin - returning registered driver
  * 3. Mid-onboarding step - resume where left off
  */
 function useInitialRoute() {
@@ -70,7 +73,7 @@ function useInitialRoute() {
         // Mid-onboarding - resume at exact step
         const stepToScreen = {
           valuePreview: 'ValuePreview',
-          bikeProfile: 'BikeProfile',
+          cabzProfile: 'CabzProfile',
           number: 'MobileNumber',
           profileConfirm: 'ProfileConfirmation',
           createPin: 'CreatePin',
@@ -104,15 +107,15 @@ function LoadingScreen() {
     }}>
       <Text style={{
         fontSize: 16,
-        color: '#333',
+        color: '#1a1c20',
         fontWeight: '600',
         marginBottom: 12,
       }}>
-        🏍️ Loading Smart Cabz...
+        🚕 Loading Smart Cabz...
       </Text>
       <Text style={{
         fontSize: 12,
-        color: '#999',
+        color: '#5b606c',
       }}>
         Getting your account ready
       </Text>
@@ -135,7 +138,7 @@ function ErrorScreen({ error }) {
     }}>
       <Text style={{
         fontSize: 18,
-        color: '#d32f2f',
+        color: '#e0453f',
         textAlign: 'center',
         marginBottom: 10,
         fontWeight: '700',
@@ -144,7 +147,7 @@ function ErrorScreen({ error }) {
       </Text>
       <Text style={{
         fontSize: 14,
-        color: '#666',
+        color: '#5b606c',
         textAlign: 'center',
         marginBottom: 20,
         lineHeight: 20,
@@ -153,7 +156,7 @@ function ErrorScreen({ error }) {
       </Text>
       <Text style={{
         fontSize: 11,
-        color: '#999',
+        color: '#8a8a8a',
         textAlign: 'center',
         fontFamily: 'monospace',
         marginBottom: 20,
@@ -162,14 +165,14 @@ function ErrorScreen({ error }) {
       </Text>
       <Text style={{
         fontSize: 12,
-        color: '#666',
+        color: '#5b606c',
         textAlign: 'center',
       }}>
         If this persists, please contact support:
       </Text>
       <Text style={{
         fontSize: 12,
-        color: '#333',
+        color: '#1a1c20',
         textAlign: 'center',
         fontWeight: '600',
         marginTop: 8,
@@ -187,7 +190,7 @@ function ErrorScreen({ error }) {
  * The PinLoginScreen navigates to "Home" using:
  * navigation.reset({ index: 0, routes: [{ name: 'Home' }] })
  * 
- * "Home" is defined at line 134 as MainNavigator component
+ * "Home" is defined as MainNavigator component
  */
 export default function OnboardingNavigator() {
   const { route: initialRoute, error } = useInitialRoute();
@@ -221,8 +224,8 @@ export default function OnboardingNavigator() {
           component={ValuePreviewScreen} 
         />
         <Stack.Screen 
-          name="BikeProfile" 
-          component={BikeProfileScreen} 
+          name="CabzProfile" 
+          component={CabzProfileScreen} 
         />
         <Stack.Screen 
           name="MobileNumber" 
@@ -237,8 +240,8 @@ export default function OnboardingNavigator() {
           component={CreatePinScreen} 
         />
 
-        {/* PIN LOGIN & RECOVERY (for returning/registered riders) */}
-        {/* ✅ CRITICAL: Import is NOW from /auth/ path (was /onboarding/) */}
+        {/* PIN LOGIN & RECOVERY (for returning/registered drivers) */}
+        {/* ✅ CRITICAL: Import is NOW from /auth/ path (NOT /onboarding/) */}
         <Stack.Screen 
           name="PinLogin" 
           component={PinLoginScreen} 
@@ -272,7 +275,7 @@ export default function OnboardingNavigator() {
  * Screen Names Available:
  * - "LanguageSelection" → First time user picks language
  * - "ValuePreview" → Onboarding step 1
- * - "BikeProfile" → Onboarding step 2
+ * - "CabzProfile" → Onboarding step 2 (formerly "BikeProfile")
  * - "MobileNumber" → Onboarding step 3
  * - "ProfileConfirmation" → Onboarding step 4
  * - "CreatePin" → Onboarding step 5
@@ -282,7 +285,7 @@ export default function OnboardingNavigator() {
  * - "ForgotPinConfirmation" → Confirmation screen
  * - "TermsOfService" → Legal screen
  * - "DataPrivacy" → Privacy screen
- * - "Home" → Main app (MainNavigator) - returned riders go here after login
+ * - "Home" → Main app (MainNavigator) - returned drivers go here after login
  * 
  * What happens after successful PIN login:
  * PinLoginScreen calls:

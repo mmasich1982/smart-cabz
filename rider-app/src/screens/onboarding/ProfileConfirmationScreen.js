@@ -2,7 +2,7 @@
 // FIXED: Now saves rider_id to both rider_status AND separate rider_id key for RiderContext access
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Checkbox from 'expo-checkbox';
 import NetInfo from '@react-native-community/netinfo';
 import OnboardingProgressBar from '../../components/OnboardingProgressBar';
@@ -85,7 +85,7 @@ export default function ProfileConfirmationScreen({ route, navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <Text style={styles.backLink} onPress={() => navigation.goBack()}>← Back</Text>
       <OnboardingProgressBar currentStep="profileConfirm" />
       <Text style={styles.title}>{t('profile.title')}</Text>
@@ -129,7 +129,7 @@ export default function ProfileConfirmationScreen({ route, navigation }) {
         onPress={handleContinue} 
         disabled={!fullName || !consent} 
       />
-    </View>
+    </ScrollView>
   );
 }
 

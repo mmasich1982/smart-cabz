@@ -17,7 +17,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 import { useTranslation } from '../../i18n/LocalizationProvider';
 import { useToast } from '../../components/Toast';
 import api from '../../api/client';
-import { saveRiderAccountSummary, saveLocalBikeProfile, saveLocalRiderStatus, saveLocalRiderId } from '../../offline/db';
+import { saveRiderAccountSummary, saveLocalCabzProfile, saveLocalRiderStatus, saveLocalRiderId } from '../../offline/db';
 import { updateRiderOnboardingDate } from '../../offline/tripsRepository';
 import { savePinLocally } from '../../offline/pinUtility';
 
@@ -81,10 +81,10 @@ export default function CreatePinScreen({ route, navigation }) {
         console.log('[CreatePin] Cached rider account summary');
       }
       
-      // FIXED: Cache bike profile
-      if (data.bike_profile) {
-        await saveLocalBikeProfile(data.bike_profile);
-        console.log('[CreatePin] Cached bike profile');
+      // FIXED: Cache cabz profile
+      if (data.cabz_profile) {
+        await saveLocalCabzProfile(data.cabz_profile);
+        console.log('[CreatePin] Cached cabz profile');
       }
       
       // FIXED: Update rider status to indicate onboarding completion
