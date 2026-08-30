@@ -12,6 +12,8 @@
         fromDatabase:
           name: smart-boda-db
           property: connectionString
+      - key: DB_SCHEMA
+        value: "smart_cabz"
       - key: JWT_SECRET_KEY
         value: "iwillrestoreuntoyoualltheyearsthathavebeenlost"
       - key: JWT_ALGORITHM
