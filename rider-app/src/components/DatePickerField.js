@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { COLORS } from '../constants/colors';
 
 export default function DatePickerField({
   label,
@@ -101,8 +102,8 @@ const styles = StyleSheet.create({
     transition: '150ms',
   },
   inputFocused: {
-    borderColor: '#ff7a1a',
-    shadowColor: '#ff7a1a',
+    borderColor: COLORS.CABZ_YELLOW,
+    shadowColor: COLORS.CABZ_YELLOW,
     shadowOpacity: 0.12,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 0 },

@@ -1,10 +1,11 @@
 // rider-app/src/components/BreakdownBar.js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { COLORS } from '../constants/colors';
 
 // Central, single source of truth for channel colour — imported anywhere a channel is drawn.
 export const CHANNEL_COLORS = {
-  Cash: '#ff7a1a', SendMoney: '#ffc93c', Till: '#1e9e6f', Paybill: '#5b8def', Pochi: '#c98a12',
+  Cash: COLORS.CABZ_YELLOW, SendMoney: '#ffc93c', Till: '#1e9e6f', Paybill: '#5b8def', Pochi: '#c98a12',
 };
 
 // segments: [{ code, label, amount }]. BR-SB06-003: caller only renders this when total > 0.

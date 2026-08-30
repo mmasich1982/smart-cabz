@@ -7,6 +7,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-na
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useToast } from './Toast';
+import { COLORS } from '../constants/colors';
 
 /**
  * InstallPrompt Component
@@ -316,11 +317,11 @@ const styles = StyleSheet.create({
 
   promptBtnPrimary: {
     flex: 1,
-    backgroundColor: '#ff7a1a',
+    backgroundColor: COLORS.CABZ_YELLOW,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
-    shadowColor: '#ff7a1a',
+    shadowColor: COLORS.CABZ_YELLOW,
     shadowOpacity: 0.55,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },

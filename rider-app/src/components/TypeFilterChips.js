@@ -1,6 +1,7 @@
 // rider-app/src/components/TypeFilterChips.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { COLORS } from '../constants/colors';
 
 export default function TypeFilterChips({ options, active, onChange }) {
   return (
@@ -18,7 +19,7 @@ export default function TypeFilterChips({ options, active, onChange }) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   chip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, backgroundColor: '#eef2f7' },
-  chipActive: { backgroundColor: '#ff7a1a' },
+  chipActive: { backgroundColor: COLORS.CABZ_YELLOW },
   label: { fontSize: 12, fontWeight: '700', color: '#5b606c' },
   labelActive: { color: '#fff' },
 });

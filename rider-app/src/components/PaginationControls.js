@@ -1,6 +1,7 @@
 // rider-app/src/components/PaginationControls.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { COLORS } from '../constants/colors';
 
 // BR-SB06-008: any list exceeding the configured page size paginates rather than rendering unbounded.
 // Reproduces cleaned.html's paginationHtml() exactly: numbered page buttons (with a "…" ellipsis once
@@ -51,10 +52,10 @@ const styles = StyleSheet.create({
   meta: { fontSize: 11, color: '#5b606c', textAlign: 'center', marginBottom: 8, fontWeight: '600' },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 5, backgroundColor: '#f4f4f5', borderRadius: 14, padding: 6, marginVertical: 4 },
   btn: { minWidth: 32, height: 32, paddingHorizontal: 8, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  btnActive: { backgroundColor: '#ff7a1a' },
+  btnActive: { backgroundColor: COLORS.CABZ_YELLOW },
   btnText: { fontSize: 12.5, fontWeight: '700', color: '#5b606c' },
   btnTextActive: { color: '#fff' },
-  navText: { color: '#ff7a1a', fontSize: 15 },
+  navText: { color: COLORS.CABZ_YELLOW, fontSize: 15 },
   disabledText: { opacity: 0.35 },
   ellipsis: { color: '#5b606c', fontSize: 12, paddingHorizontal: 2 },
 });

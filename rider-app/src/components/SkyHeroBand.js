@@ -9,6 +9,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, Easing, StyleSheet, AccessibilityInfo } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PIN_HERO_GRADIENTS, PIN_HERO_STAR_POSITIONS } from '../constants/pinHeroScenes';
+import { COLORS } from '../constants/colors';
 
 function Star({ left, top, delay, reduceMotion }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
   celestial: { position: 'absolute', fontSize: 38, textShadowColor: 'rgba(255,255,255,.4)', textShadowRadius: 16 },
   sceneChip: { position: 'absolute', top: 14, right: 16, zIndex: 3, backgroundColor: 'rgba(255,255,255,.16)', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 10 },
   sceneChipText: { color: '#fff', fontSize: 10.5, fontWeight: '700' },
-  avatar: { zIndex: 2, width: 64, height: 64, borderRadius: 32, marginBottom: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ff7a1a', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  avatar: { zIndex: 2, width: 64, height: 64, borderRadius: 32, marginBottom: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.CABZ_YELLOW, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
   greeting: { zIndex: 2, fontSize: 21, fontWeight: '800', color: '#fff', marginBottom: 4, textAlign: 'center' },
   sub: { zIndex: 2, fontSize: 12.5, color: 'rgba(255,255,255,.8)', textAlign: 'center' },

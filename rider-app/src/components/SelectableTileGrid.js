@@ -3,6 +3,7 @@
 // single-select master-data list rendered as tiles rather than a dropdown or button row)
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { COLORS } from '../constants/colors';
 
 export default function SelectableTileGrid({ options, selectedCode, onSelect }) {
   return (
@@ -30,7 +31,7 @@ export default function SelectableTileGrid({ options, selectedCode, onSelect }) 
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 6 },
   tile: { flexBasis: '47%', flexGrow: 1, borderWidth: 1.5, borderColor: '#e7e4db', borderRadius: 13, padding: 12, backgroundColor: '#fff' },
-  tileSelected: { borderColor: '#ff7a1a', backgroundColor: '#fff6ee' },
+  tileSelected: { borderColor: COLORS.CABZ_YELLOW, backgroundColor: '#fff6ee' },
   emoji: { fontSize: 20, marginBottom: 5 },
   lbl: { fontWeight: '700', fontSize: 12.5, color: '#1a1c20' },
   sub: { fontSize: 10.5, color: '#5b606c', marginTop: 2 },

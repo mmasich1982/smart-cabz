@@ -1,6 +1,7 @@
 // rider-app/src/components/GoalProgressBar.js
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { COLORS } from '../constants/colors';
 
 export default function GoalProgressBar({ earned, target, testID }) {
   const pctRaw = target > 0 ? (earned / target) * 100 : 0;
@@ -14,5 +15,5 @@ export default function GoalProgressBar({ earned, target, testID }) {
 
 const styles = StyleSheet.create({
   track: { height: 8, borderRadius: 99, backgroundColor: '#e7e4db', overflow: 'hidden', marginVertical: 8 },
-  fill: { height: '100%', backgroundColor: '#ff7a1a', borderRadius: 99 },  // boda-orange
+  fill: { height: '100%', backgroundColor: COLORS.CABZ_YELLOW, borderRadius: 99 },  // Smart Cabz yellow
 });

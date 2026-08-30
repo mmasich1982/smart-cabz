@@ -3,9 +3,10 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ONBOARDING_STEPS } from '../constants/onboardingSteps';
+import { COLORS } from '../constants/colors';
 
 // BR-SB01-009: shown on every onboarding screen, never on returning-rider login.
-// Rebuilt as a single linear gradient bar (boda_orange → yellow) matching cleaned.html's .onb-progress —
+// Rebuilt as a single linear gradient bar (Smart Cabz yellow gradient) matching cleaned.html's .onb-progress —
 // replaces the old blue step-dot row, which had no equivalent in the prototype.
 // Issue 16 fix: Corrected layout - percentage on right, step label properly positioned
 export default function OnboardingProgressBar({ currentStep }) {
@@ -21,7 +22,7 @@ export default function OnboardingProgressBar({ currentStep }) {
         <Text style={styles.percentLabel}>{pct}%</Text>
       </View>
       <View style={styles.track}>
-        <LinearGradient colors={['#ff7a1a', '#ffc93c']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${pct}%` }]} />
+        <LinearGradient colors={[COLORS.CABZ_YELLOW, COLORS.CABZ_GOLD]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.fill, { width: `${pct}%` }]} />
       </View>
     </View>
   );

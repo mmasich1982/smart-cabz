@@ -1,6 +1,7 @@
 // rider-app/src/components/GhostButton.js
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { COLORS } from '../constants/colors';
 
 /**
  * GhostButton - An outlined/ghost style button for secondary actions
@@ -25,7 +26,7 @@ const styles = StyleSheet.create({
   btn: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#ff7a1a',
+    borderColor: COLORS.CABZ_YELLOW,
     paddingVertical: 13,
     paddingHorizontal: 16,
     borderRadius: 13,
@@ -34,14 +35,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   btnDisabled: {
-    borderColor: '#e9dccc',
+    borderColor: COLORS.DISABLED_BG,
   },
   btnText: {
-    color: '#ff7a1a',
+    color: COLORS.CABZ_YELLOW,
     fontWeight: '700',
     fontSize: 15,
   },
   btnTextDisabled: {
-    color: '#9b8975',
+    color: COLORS.DISABLED_TEXT,
   },
 });
