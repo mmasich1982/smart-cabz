@@ -13,7 +13,7 @@ import { saveLocalBikeProfile, checkLocalPlateCache } from '../../offline/db';
 import { enqueue } from '../../offline/syncQueue';
 
 // SB-02-A + SB-02-B combined, matching the single-screen prototype flow exactly
-// FIXED: NO Smart Boda branding header (only appears in app-topbar)
+// FIXED: NO Smart Cabz branding header (only appears in app-topbar)
 // FIXED: Unique plate validation with backend check
 export default function BikeProfileScreen({ navigation }) {
   const { fuelTypes } = useMasterData();
@@ -80,13 +80,13 @@ export default function BikeProfileScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* NO Smart Boda branding here - only in app-topbar per cleaned.html */}
+      {/* NO Smart Cabz branding here - only in app-topbar per cleaned.html */}
       
       <Text style={styles.backLink} onPress={() => navigation.goBack()}>← Back</Text>
       <OnboardingProgressBar currentStep="bikeProfile" />
       <View style={styles.eyebrow}><Text style={styles.eyebrowText}>🔑 Almost there</Text></View>
-      <Text style={styles.title}>{t('bike.title') || 'Set Up Your Bike'}</Text>
-      <Text style={styles.sub}>{t('bike.subtitle') || 'A few quick details and this bike is fully set up. Works even with no internet.'}</Text>
+      <Text style={styles.title}>{t('bike.title') || 'Set Up Your Car'}</Text>
+      <Text style={styles.sub}>{t('bike.subtitle') || 'A few quick details and this car is fully set up. Works even with no internet.'}</Text>
       
       <FormField
         label={t('bike.plate_label') || 'Number Plate'}

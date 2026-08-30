@@ -30,7 +30,7 @@ export default function ValuePreviewScreen({ navigation }) {
           fallback: true,
           sample_weekly_earnings_ksh: 14200,
           sample_weekly_costs_ksh: 3650,
-          message: t('preview.fallback') || 'Track your daily boda earnings, costs, and profit — automatically.'
+          message: t('preview.fallback') || 'Track your daily car earnings, costs, and profit — automatically.'
         });
       } finally {
         setLoading(false);
@@ -67,7 +67,7 @@ export default function ValuePreviewScreen({ navigation }) {
         onBack={handleBack} 
         eyebrow={t('preview.eyebrow') || '✨ A peek at what\'s waiting for you'}
         title={t('preview.title') || 'This Could Be Your Week 💰'}
-        subtitle={t('preview.subtitle') || 'This is what riders see every week, once their bike is set up.'} 
+        subtitle={t('preview.subtitle') || 'This is what riders see every week, once their car is set up.'} 
       />
 
       <View style={styles.contentContainer}>
@@ -86,7 +86,7 @@ export default function ValuePreviewScreen({ navigation }) {
       </View>
 
       <PrimaryButton 
-        label={t('preview.cta') || 'Set Up My Bike Now →'}
+        label={t('preview.cta') || 'Set Up My Car Now →'}
         glow 
         onPress={() => navigation.navigate('BikeProfile')} 
       />

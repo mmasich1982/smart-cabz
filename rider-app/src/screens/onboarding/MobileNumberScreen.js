@@ -40,7 +40,7 @@ export default function MobileNumberScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* NO Smart Boda branding - only in app-topbar */}
+      {/* NO Smart Cabz branding - only in app-topbar */}
       
       <Text style={styles.backLink} onPress={() => navigation.goBack()}>← Back</Text>
       <OnboardingProgressBar currentStep="number" />
@@ -49,7 +49,7 @@ export default function MobileNumberScreen({ navigation }) {
       
       {/* Bonus banner */}
       <View style={styles.bonusBanner}>
-        <Text style={styles.bonusText}>{t('number.bonus_banner') || '🎁 Unlock 2 free hours of Smart Boda Access — clear, simple insights into your earnings and expenses from your very first trip.'}</Text>
+        <Text style={styles.bonusText}>{t('number.bonus_banner') || '🎁 Unlock 2 free hours of Smart Cabz Access — clear, simple insights into your earnings and expenses from your very first trip.'}</Text>
       </View>
       
       <FormField 

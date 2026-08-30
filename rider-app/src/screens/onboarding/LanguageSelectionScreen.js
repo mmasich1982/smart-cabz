@@ -13,7 +13,7 @@ import { useTranslation } from '../../i18n/LocalizationProvider';
 // SB-01-A. No onboarding progress bar here per prototype: this screen precedes step 1.
 // NOTE: the language list itself is 100% Super Admin master data (language_master, is_active=true) —
 // this screen never hardcodes "English"/"Kiswahili"; MVP0 simply has two rows active today.
-// FIXED: NO Smart Boda branding header (appears in app-topbar only)
+// FIXED: NO Smart Cabz branding header (appears in app-topbar only)
 // FIXED: NO language pre-selection on app launch
 export default function LanguageSelectionScreen({ navigation }) {
   const { languages } = useMasterData();
