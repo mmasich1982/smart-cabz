@@ -67,7 +67,7 @@ export default function ValuePreviewScreen({ navigation }) {
         onBack={handleBack} 
         eyebrow={t('preview.eyebrow') || '✨ A peek at what\'s waiting for you'}
         title={t('preview.title') || 'This Could Be Your Week 💰'}
-        subtitle={t('preview.subtitle') || 'This is what drivers see every week, once their cabz is set up.'} 
+        subtitle={t('preview.subtitle') || 'This is what drivers see every week, once their cab is set up.'} 
       />
 
       <View style={styles.contentContainer}>
@@ -86,7 +86,7 @@ export default function ValuePreviewScreen({ navigation }) {
       </View>
 
       <PrimaryButton 
-        label={t('preview.cta') || 'Set Up My Cabz Now →'}
+        label={t('preview.cta') || 'Set Up My Cab Now →'}
         glow 
         onPress={() => navigation.navigate('CabzProfile')} 
       />

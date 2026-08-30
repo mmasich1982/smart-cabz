@@ -99,6 +99,70 @@ export async function saveLocalBikeProfile(profile) {
   }
 }
 
+// ========== CABZ PROFILE (Smart Boda Branding for Bike) ==========
+// ✅ FIXED: Added missing functions for onboarding compatibility
+
+export async function getSavCabzProfile() {
+  /**
+   * Retrieves the saved Cabz (bike) profile from local storage.
+   * This is an alias for getActiveBikeProfile for onboarding compatibility.
+   */
+  try {
+    const profile = await indexedDbAdapter.kvGet('cabz_profile');
+    console.log('✅ getCabzProfile:', profile);
+    return profile;
+  } catch (err) {
+    console.error('❌ getCabzProfile error:', err);
+    return null;
+  }
+}
+
+export async function saveLocalCabzProfile(profile) {
+  /**
+   * ✅ FIXED: Missing function that stores Cabz (bike) profile locally
+   * Used during onboarding (CabzProfileScreen) to store bike details before sync.
+   * 
+   * Expected profile object:
+   * {
+   *   number_plate: "KCA123A",
+   *   fuel_type_code: "petrol",
+   *   submitted_at: "2024-08-30T14:30:00Z"
+   * }
+   */
+  try {
+    if (!profile || typeof profile !== 'object') {
+      console.warn('⚠️ Invalid profile data provided to saveLocalCabzProfile:', profile);
+      return false;
+    }
+    
+    // Save to both 'cabz_profile' and 'active_bike_profile' for compatibility
+    await indexedDbAdapter.kvSet('cabz_profile', profile);
+    await indexedDbAdapter.kvSet('active_bike_profile', profile);
+    
+    console.log('✅ Saved Cabz profile:', profile);
+    return true;
+  } catch (err) {
+    console.error('❌ saveLocalCabzProfile error:', err);
+    return false;
+  }
+}
+
+export async function clearLocalCabzProfile() {
+  /**
+   * Clears the saved Cabz profile from local storage.
+   * Used during logout or profile reset.
+   */
+  try {
+    await indexedDbAdapter.kvSet('cabz_profile', null);
+    await indexedDbAdapter.kvSet('active_bike_profile', null);
+    console.log('✅ Cleared Cabz profile');
+    return true;
+  } catch (err) {
+    console.error('❌ clearLocalCabzProfile error:', err);
+    return false;
+  }
+}
+
 // ========== LANGUAGE PREFERENCES ==========
 // ✅ Both naming conventions included for compatibility
 

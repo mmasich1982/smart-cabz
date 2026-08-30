@@ -169,17 +169,20 @@ export function LocalizationProvider({ children }) {
       }
 
       // ✅ STEP 3: Try API (get fresh data)
+      // ✅ FIXED: Enhanced error handling for CORS and network errors
       let apiSuccess = false;
       try {
+        console.log(`[i18n] 🌐 Attempting API fetch for /onboarding/translations/${code}`);
         const res = await api.get(`/onboarding/translations/${code}`);
-        if (res.data && Object.keys(res.data).length > 0) {
+        
+        if (res && res.data && Object.keys(res.data).length > 0) {
           // ✅ MERGE API with fallback (don't replace!)
           // This ensures API updates override fallback, but fallback provides missing keys
           const mergedStrings = { ...fallbackToUse, ...res.data };
           setStrings(mergedStrings);
           setLoadingStatus('fresh');
           apiSuccess = true;
-          console.log(`[i18n] 🌐 Fetched fresh ${languageName} from API, Keys:`, Object.keys(res.data).length);
+          console.log(`[i18n] ✅ Fetched fresh ${languageName} from API, Keys:`, Object.keys(res.data).length);
           console.log(`[i18n] ✅ Merged with fallback, Total Keys:`, Object.keys(mergedStrings).length);
           
           // Store in cache for next time
@@ -189,10 +192,27 @@ export function LocalizationProvider({ children }) {
           } catch (cacheErr) {
             console.warn('[i18n] Failed to cache translations:', cacheErr.message);
           }
+        } else {
+          console.warn(`[i18n] ⚠️ API returned empty response for ${languageName}`);
         }
       } catch (apiErr) {
-        console.warn(`[i18n] API fetch failed for ${languageName} (${code})`, '—', apiErr.message);
+        // ✅ FIXED: Detect and handle CORS errors gracefully
+        const errorType = apiErr.response?.status === 0 ? 'CORS/Network' : 
+                         apiErr.message?.includes('CORS') ? 'CORS' :
+                         apiErr.response?.status ? `HTTP ${apiErr.response.status}` : 'Network';
+        
+        console.warn(`[i18n] ⚠️ API fetch failed for ${languageName} (${code})`);
+        console.warn(`[i18n] Error type: ${errorType}`);
+        console.warn(`[i18n] Error message:`, apiErr.message);
+        
+        if (errorType.includes('CORS')) {
+          console.warn('[i18n] 💡 CORS error detected - API may not have proper CORS headers');
+          console.warn('[i18n] 💡 Check backend CORS configuration in main.py');
+          console.warn('[i18n] 💡 Continuing with fallback + cache');
+        }
+        
         // API failure is OK if we have cache or fallback
+        // The app will still work with bundled translations
       }
 
       // ✅ STEP 4: Verify we have strings loaded (should always be true due to fallback)

@@ -85,8 +85,8 @@ export default function CabzProfileScreen({ navigation }) {
       <Text style={styles.backLink} onPress={() => navigation.goBack()}>← Back</Text>
       <OnboardingProgressBar currentStep="cabzProfile" />
       <View style={styles.eyebrow}><Text style={styles.eyebrowText}>🔑 Almost there</Text></View>
-      <Text style={styles.title}>{t('cabz.title') || 'Set Up Your Cabz'}</Text>
-      <Text style={styles.sub}>{t('cabz.subtitle') || 'A few quick details and your cabz is fully set up. Works even with no internet.'}</Text>
+      <Text style={styles.title}>{t('cabz.title') || 'Set Up Your Cab'}</Text>
+      <Text style={styles.sub}>{t('cabz.subtitle') || 'A few quick details and your cab is fully set up. Works even with no internet.'}</Text>
       
       <FormField
         label={t('cabz.plate_label') || 'Number Plate'}
@@ -95,7 +95,7 @@ export default function CabzProfileScreen({ navigation }) {
         onBlur={handlePlateBlur}
         autoUppercase
         maxLength={12}
-        placeholder="e.g. KMEA 001A"
+        placeholder="e.g. KDA 001A"
         error={plateError}
         required={true}
       />

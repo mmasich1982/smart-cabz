@@ -29,19 +29,28 @@ def get_fuel_types(db: Session = Depends(get_db)):
     GET /onboarding/fuel-types
     
     Get list of available fuel types for bike registration.
-    Returns: [{code, display_name, description}]
-    """
-    fuel_types = db.query(FuelTypeMaster).filter_by(is_active=True).order_by(FuelTypeMaster.sort_order).all()
+    ✅ FIXED: Added error handling
     
-    return [
-        {
-            "code": ft.code,
-            "display_name": ft.display_name,
-            "description": getattr(ft, 'description', f"Fuel type: {ft.display_name}"),
-            "sort_order": ft.sort_order
-        }
-        for ft in fuel_types
-    ]
+    Returns: [{code, display_name, description, sort_order}]
+    """
+    try:
+        fuel_types = db.query(FuelTypeMaster).filter_by(is_active=True).order_by(FuelTypeMaster.sort_order).all()
+        
+        return [
+            {
+                "code": ft.code,
+                "display_name": ft.display_name,
+                "description": getattr(ft, 'description', f"Fuel type: {ft.display_name}"),
+                "sort_order": ft.sort_order
+            }
+            for ft in fuel_types
+        ]
+    except Exception as e:
+        logger.error(f"Error fetching fuel types: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch fuel types. Please try again."
+        )
 
 
 # ============================================================================
@@ -56,6 +65,8 @@ def check_plate_uniqueness(number_plate: str, db: Session = Depends(get_db)):
     Check if a number plate is already registered in the system.
     Provides real-time validation feedback for the bike profile screen.
     
+    ✅ FIXED: Comprehensive error handling prevents 500 errors
+    
     Returns:
     {
         "exists": false,                              # Is this plate already registered?
@@ -69,66 +80,96 @@ def check_plate_uniqueness(number_plate: str, db: Session = Depends(get_db)):
     - duplicate: Same plate registered to another active rider
     - duplicate_pending: Same plate involved in a duplicate case under review
     """
-    # Validate input
-    if not number_plate or not number_plate.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Number plate cannot be empty"
-        )
-    
-    # Clean the plate: uppercase and trim whitespace
-    cleaned_plate = number_plate.strip().upper()
-    
-    # Validate format (basic check)
-    if len(cleaned_plate) < 5 or len(cleaned_plate) > 12:
-        raise HTTPException(
-            status_code=400,
-            detail="Number plate must be between 5-12 characters. Format: KCA123A"
-        )
-    
-    # Check for exact match in bike profiles
-    existing_bike = db.query(BikeProfile).filter(
-        BikeProfile.number_plate == cleaned_plate,
-        BikeProfile.is_active == True
-    ).first()
-    
-    if existing_bike:
-        # Get the rider details for the message
-        rider = db.query(Rider).get(existing_bike.rider_id)
-        rider_name = rider.full_name if rider and rider.full_name else "another rider"
+    try:
+        # Validate input
+        if not number_plate or not number_plate.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Number plate cannot be empty"
+            )
         
+        # Clean the plate: uppercase and trim whitespace
+        cleaned_plate = number_plate.strip().upper()
+        
+        # Validate format (basic check)
+        if len(cleaned_plate) < 5 or len(cleaned_plate) > 12:
+            raise HTTPException(
+                status_code=400,
+                detail="Number plate must be between 5-12 characters. Format: KCA123A"
+            )
+        
+        # ✅ FIXED: Wrap database queries in try-catch to handle errors gracefully
+        try:
+            # Check for exact match in bike profiles
+            existing_bike = db.query(BikeProfile).filter(
+                BikeProfile.number_plate == cleaned_plate,
+                BikeProfile.is_active == True
+            ).first()
+            
+            if existing_bike:
+                # Get the rider details for the message
+                try:
+                    rider = db.query(Rider).get(existing_bike.rider_id)
+                    rider_name = rider.full_name if rider and rider.full_name else "another rider"
+                except Exception as rider_err:
+                    logger.warning(f"Could not fetch rider details for plate {cleaned_plate}: {rider_err}")
+                    rider_name = "another rider"
+                
+                return {
+                    "exists": True,
+                    "number_plate": cleaned_plate,
+                    "message": f"This number plate is already registered to {rider_name}. Please check and re-enter if incorrect.",
+                    "status": "duplicate",
+                    "registered_to": rider_name if rider else "Unknown",
+                    "registered_at": existing_bike.submitted_at.isoformat() if existing_bike.submitted_at else None
+                }
+        except HTTPException:
+            raise
+        except Exception as db_err:
+            logger.error(f"Database error checking existing bikes for plate {cleaned_plate}: {str(db_err)}")
+            raise HTTPException(
+                status_code=500,
+                detail="Error checking plate availability. Please try again."
+            )
+        
+        # ✅ FIXED: Wrap duplicate case check in try-catch
+        try:
+            # Check if there's a duplicate case pending for this plate
+            pending_case = db.query(DuplicatePlateCase).filter(
+                DuplicatePlateCase.number_plate == cleaned_plate,
+                DuplicatePlateCase.status == "pending_review"
+            ).first()
+            
+            if pending_case:
+                return {
+                    "exists": True,
+                    "number_plate": cleaned_plate,
+                    "message": "This plate is currently under review due to a duplicate registration claim. Please contact support.",
+                    "status": "duplicate_pending",
+                    "case_id": pending_case.id,
+                    "note": "Your registration may be temporarily held pending resolution"
+                }
+        except Exception as case_err:
+            logger.warning(f"Could not check duplicate cases for plate {cleaned_plate}: {str(case_err)}")
+            # Continue anyway - plate can still be available
+        
+        # No conflicts found
+        logger.info(f"Plate {cleaned_plate} is available")
         return {
-            "exists": True,
+            "exists": False,
             "number_plate": cleaned_plate,
-            "message": f"This number plate is already registered to {rider_name}. Please check and re-enter if incorrect.",
-            "status": "duplicate",
-            "registered_to": rider_name if rider else "Unknown",
-            "registered_at": existing_bike.submitted_at.isoformat() if existing_bike.submitted_at else None
+            "message": "This plate is available and ready to use!",
+            "status": "available"
         }
-    
-    # Check if there's a duplicate case pending for this plate
-    pending_case = db.query(DuplicatePlateCase).filter(
-        DuplicatePlateCase.number_plate == cleaned_plate,
-        DuplicatePlateCase.status == "pending_review"
-    ).first()
-    
-    if pending_case:
-        return {
-            "exists": True,
-            "number_plate": cleaned_plate,
-            "message": "This plate is currently under review due to a duplicate registration claim. Please contact support.",
-            "status": "duplicate_pending",
-            "case_id": pending_case.id,
-            "note": "Your registration may be temporarily held pending resolution"
-        }
-    
-    # No conflicts found
-    return {
-        "exists": False,
-        "number_plate": cleaned_plate,
-        "message": "This plate is available and ready to use!",
-        "status": "available"
-    }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in check_plate_uniqueness: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while checking plate availability. Please try again."
+        )
 
 
 # ============================================================================
