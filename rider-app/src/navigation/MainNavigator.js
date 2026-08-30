@@ -407,61 +407,7 @@ export const MainNavigator = () => {
         }}
       />
 
-      <Stack.Screen
-        name="DataExportRequest"
-        component={DataExportRequestScreen}
-        options={{
-          headerShown: false,
-          animationEnabled: true,
-        }}
-      />
-
-      {/* ===== TILE 16: MY SETTINGS & CABZ PROFILE ===== */}
-      <Stack.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          headerShown: false,
-          animationEnabled: true,
-        }}
-      />
-
       {/* ===== SUPPORTING SCREENS ===== */}
-      <Stack.Screen
-        name="ProfileConfirmation"
-        component={ProfileConfirmationScreen}
-        options={{
-          headerShown: false,
-          animationEnabled: true,
-        }}
-      />
-
-      <Stack.Screen
-        name="TermsOfService"
-        component={TermsOfServiceScreen}
-        options={{
-          headerShown: false,
-          animationEnabled: true,
-        }}
-      />
-
-      <Stack.Screen
-        name="DataPrivacy"
-        component={DataPrivacyScreen}
-        options={{
-          headerShown: false,
-          animationEnabled: true,
-        }}
-      />
-
-      <Stack.Screen
-        name="LegalDocument"
-        component={LegalDocumentScreen}
-        options={{
-          headerShown: false,
-          animationEnabled: true,
-        }}
-      />
     </Stack.Navigator>
   );
 };
