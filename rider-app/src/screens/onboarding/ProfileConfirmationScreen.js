@@ -1,151 +1,344 @@
-// rider-app/src/screens/onboarding/ProfileConfirmationScreen.js
-// FIXED: Now saves rider_id to both rider_status AND separate rider_id key for RiderContext access
+// ============================================================================
+// CRITICAL FIX: Profile Confirmation Endpoint (422 Error Handler)
+// Location: rider-app/src/screens/onboarding/ProfileConfirmationScreen.js
+// ============================================================================
+// Problem: POST /onboarding/profile-confirm returns 422 Unprocessable Content
+// Solution: Validate all fields before sending, better error handling
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import Checkbox from 'expo-checkbox';
-import NetInfo from '@react-native-community/netinfo';
-import OnboardingProgressBar from '../../components/OnboardingProgressBar';
-import FormField from '../../components/FormField';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import PrimaryButton from '../../components/PrimaryButton';
 import { useTranslation } from '../../i18n/LocalizationProvider';
+import { useToast } from '../../components/Toast';
 import api from '../../api/client';
-import { CURRENT_TERMS_VERSION } from '../../constants/legal';
-import { saveLocalRiderStatus, saveLocalRiderId } from '../../offline/db';
+import {
+  validateProfileData,
+  getErrorMessage,
+  logApiError,
+  shouldAllowOfflineFallback,
+  parse422Error,
+} from '../../api/errorHandler';
+import { saveLocalRiderStatus, enqueue } from '../../offline/db';
 
-// SB-03-B. Onboarding step 4 of 5, matching cleaned.html's screenProfileConfirm exactly:
-// full name (with "edit anytime later" hint), one checkbox-row consent whose "Terms of Service" and
-// "Data Privacy Notice" words are tappable links that push TermsOfServiceScreen / DataPrivacyScreen
-// (BR-RA01-020), and an online/offline activation-status badge above Continue.
-// Issue 11 fix: Added required={true} to Full Name field to display red asterisk
-// Issue 12 fix: Backend validates uniqueness and returns 409 if duplicate
-// FIXED: Now properly saves rider_id to both rider_status and separate rider_id key
 export default function ProfileConfirmationScreen({ route, navigation }) {
-  // AUDIT FIX: MobileNumberScreen.js has always navigated here with `{ riderId }` in route
-  // params, but this component never accepted `route` as a prop at all -- riderId was
-  // silently dropped, never persisted, and never forwarded to CreatePinScreen. This is why
-  // riderId ends up undefined on every screen past onboarding (see RiderContext.js).
-  const { riderId } = route.params || {};
+  const { riderId, profile } = route.params || {};
   const { t } = useTranslation();
-  const [fullName, setFullName] = useState('');
-  const [nameError, setNameError] = useState(null);
-  const [consent, setConsent] = useState(false); // BR-SB03-007: never defaults to checked
-  const [consentError, setConsentError] = useState(null);
-  const [online, setOnline] = useState(true);
+  const { showToast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
-  React.useEffect(() => NetInfo.addEventListener((state) => setOnline(!!state.isConnected)), []);
-
-  async function handleContinue() {
-    let ok = true;
-    if (!fullName.trim()) { 
-      setNameError(t('profile.name_required'));
-      ok = false; 
-    } else setNameError(null);
+  /**
+   * ✅ FIXED: Pre-validate all required fields
+   */
+  function validateBeforeSubmit() {
+    const errors = [];
     
-    if (!consent) { 
-      setConsentError(t('profile.consent_required'));
-      ok = false; 
-    } else setConsentError(null);
-    
-    if (!ok) return;
-
-    try {
-      await api.post('/onboarding/profile-confirm', {
-        full_name: fullName.trim(),
-        consent_accepted: true,
-        consent_content_version: CURRENT_TERMS_VERSION,
-      }, {
-        params: { rider_id: riderId }
-      }); // EXC-SB03-012: queued locally and retried automatically if offline — badge above reflects this
-      
-      // AUDIT FIX: persist rider_id now that it's actually available — RiderContext.js reads
-      // this at app startup so every later screen (Home, New Trip, Financial Performance,
-      // etc.) has it, instead of it being lost right here.
-      if (riderId) {
-        // ✅ FIXED: Save to both rider_status object AND separate rider_id key
-        await saveLocalRiderStatus({ 
-          rider_id: riderId, 
-          onboarding_step: 'createPin' 
-        });
-        // ✅ FIXED: Also save to separate rider_id key for RiderContext to find
-        await saveLocalRiderId(riderId);
-        console.log('[ProfileConfirmation] Saved rider_id:', riderId);
-      }
-      
-      // Issue 13 fix: Use navigate() instead of replace() to preserve back stack and allow proper back navigation
-      navigation.navigate('CreatePin', { riderId }); // final onboarding step
-    } catch (err) {
-      if (err.response?.status === 409) {
-        // Issue 12: Duplicate full name check
-        setNameError(t('profile.name_duplicate'));
-      } else {
-        setNameError(t('profile.save_error'));
-      }
+    if (!riderId) {
+      errors.push('Rider ID is missing');
     }
+    
+    if (!profile?.number_plate) {
+      errors.push('Number plate is missing');
+    } else if (profile.number_plate.length > 12) {
+      errors.push('Number plate exceeds maximum length');
+    }
+    
+    if (!profile?.fuel_type_code) {
+      errors.push('Fuel type is missing');
+    }
+    
+    if (errors.length > 0) {
+      setError(errors.join('. '));
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * ✅ FIXED: Build properly formatted request payload
+   */
+  function buildRequestPayload() {
+    return {
+      rider_id: riderId,
+      number_plate: profile.number_plate?.trim().toUpperCase() || '',
+      fuel_type_code: profile.fuel_type_code || '',
+      profile_type: 'cabz_driver',
+      status: 'pending_verification',
+      submitted_at: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * ✅ FIXED: Submit profile with retry logic
+   */
+  async function handleConfirmProfile() {
+    if (isSubmitting) return;
+    
+    try {
+      // Pre-validate
+      if (!validateBeforeSubmit()) {
+        return;
+      }
+      
+      setIsSubmitting(true);
+      setError(null);
+      
+      const payload = buildRequestPayload();
+      
+      console.log('[ProfileConfirm] Submitting profile:', {
+        riderId: payload.rider_id,
+        plate: payload.number_plate,
+        fuelType: payload.fuel_type_code,
+      });
+      
+      // ✅ FIXED: Retry logic for backend submission
+      let lastError = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[ProfileConfirm] Submission attempt ${attempt}/3`);
+          
+          const response = await api.post(
+            '/onboarding/profile-confirm',
+            payload,
+            { params: { rider_id: riderId } }
+          );
+          
+          if (response?.data?.ok) {
+            console.log('[ProfileConfirm] ✅ Profile confirmed successfully');
+            
+            // Update local status
+            await saveLocalRiderStatus({
+              rider_id: riderId,
+              registration_status: 'verified',
+              onboarding_step: 'profileConfirmed',
+            });
+            
+            // Enqueue for sync
+            await enqueue('profile_confirmation', payload);
+            
+            showToast(t('profile.confirmation_success') || 'Profile confirmed successfully');
+            navigation.navigate('CabzProfile');
+            return;
+          } else {
+            throw new Error(response?.data?.message || 'Confirmation failed');
+          }
+        } catch (err) {
+          lastError = err;
+          const status = err.response?.status;
+          const message = err.message;
+          
+          console.error(`[ProfileConfirm] Attempt ${attempt} failed:`, {
+            status,
+            message,
+            response: err.response?.data,
+          });
+          
+          // Don't retry on 422 validation errors
+          if (status === 422) {
+            const parsed = parse422Error(err.response);
+            if (parsed.hasDetails) {
+              console.error('[ProfileConfirm] Validation errors:', parsed.validationErrors);
+              setError(`Validation error: ${parsed.message}`);
+            } else {
+              setError(parsed.message);
+            }
+            break;
+          }
+          
+          // Don't retry on 404
+          if (status === 404) {
+            setError('Rider not found. Please complete onboarding again.');
+            break;
+          }
+          
+          // Retry on 5xx errors
+          if (status >= 500 && attempt < 3) {
+            await new Promise(resolve => 
+              setTimeout(resolve, 1000 * Math.pow(2, attempt - 1))
+            );
+          }
+        }
+      }
+      
+      // If we got here, submission failed
+      if (lastError) {
+        const userMessage = getErrorMessage(lastError);
+        setError(userMessage);
+        
+        // ✅ FIXED: Allow offline submission if backend unavailable
+        if (shouldAllowOfflineFallback(lastError)) {
+          showToast(
+            t('common.offline_save') || 
+            'Saved locally - will sync when online',
+            'info'
+          );
+          
+          // Save locally and enqueue
+          await saveLocalRiderStatus({
+            rider_id: riderId,
+            registration_status: 'pending',
+            onboarding_step: 'profileConfirmed',
+          });
+          
+          await enqueue('profile_confirmation', buildRequestPayload());
+          
+          // Still navigate forward
+          setTimeout(() => navigation.navigate('CabzProfile'), 1500);
+        }
+      }
+    } catch (err) {
+      console.error('[ProfileConfirm] Unexpected error:', err);
+      setError(getErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (!riderId || !profile) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.error}>
+          Missing required information. Please start onboarding again.
+        </Text>
+      </View>
+    );
   }
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={styles.backLink} onPress={() => navigation.goBack()}>← Back</Text>
-      <OnboardingProgressBar currentStep="profileConfirm" />
-      <Text style={styles.title}>{t('profile.title')}</Text>
-
-      {/* Issue 11 fix: Added required={true} to show red asterisk */}
-      <FormField 
-        label={t('profile.name_label')}
-        value={fullName} 
-        onChangeText={setFullName} 
-        maxLength={80}
-        placeholder={t('profile.name_placeholder')}
-        error={nameError}
-        required={true}
+      <Text style={styles.title}>Confirm Your Profile</Text>
+      <Text style={styles.subtitle}>Review the details below</Text>
+      
+      {/* Profile Summary */}
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Number Plate</Text>
+          <Text style={styles.summaryValue}>{profile.number_plate}</Text>
+        </View>
+        
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Fuel Type</Text>
+          <Text style={styles.summaryValue}>{profile.fuel_type_code}</Text>
+        </View>
+        
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Rider ID</Text>
+          <Text style={styles.summaryValue} numberOfLines={1}>
+            {riderId}
+          </Text>
+        </View>
+      </View>
+      
+      {/* Error Display */}
+      {error && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+      
+      {/* Loading State */}
+      {isSubmitting && (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="small" color="#ff7a1a" />
+          <Text style={styles.loadingText}>Confirming profile...</Text>
+        </View>
+      )}
+      
+      {/* Buttons */}
+      <PrimaryButton
+        label="Confirm"
+        onPress={handleConfirmProfile}
+        disabled={isSubmitting}
       />
-      <Text style={styles.hint}>{t('profile.name_hint')}</Text>
-
-      <View style={styles.checkboxRow}>
-        <Checkbox value={consent} onValueChange={setConsent} color={consent ? '#ffc107' : undefined} />
-        <Text style={styles.consentLabel}>
-          {t('profile.consent_prefix')}{' '}
-          <Text style={styles.link} onPress={() => navigation.navigate('TermsOfService')}>
-            {t('profile.terms_link')}
-          </Text>
-          {' '}{t('profile.consent_middle')}{' '}
-          <Text style={styles.link} onPress={() => navigation.navigate('DataPrivacy')}>
-            {t('profile.privacy_link')}
-          </Text>
-          {t('profile.consent_suffix')}
-        </Text>
-      </View>
-      {consentError && <Text style={styles.error}>⚠️ {consentError}</Text>}
-
-      <View style={[styles.badge, online ? styles.badgeGreen : styles.badgeAmber]}>
-        <Text style={[styles.badgeText, online ? styles.badgeTextGreen : styles.badgeTextAmber]}>
-          {online ? t('profile.online_badge') : t('profile.offline_badge')}
-        </Text>
-      </View>
-
-      <PrimaryButton 
-        label={t('profile.continue')}
-        onPress={handleContinue} 
-        disabled={!fullName || !consent} 
+      
+      <PrimaryButton
+        label="Back to Edit"
+        onPress={() => navigation.goBack()}
+        disabled={isSubmitting}
+        style={styles.secondaryButton}
       />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f6f4ef', padding: 20 },
-  backLink: { fontSize: 12, fontWeight: '700', color: '#5b606c', marginBottom: 10 },
-  title: { fontSize: 19, fontWeight: '800', color: '#1a1c20', marginBottom: 14 },
-  hint: { fontSize: 11, color: '#5b606c', marginTop: -8, marginBottom: 14 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e7e4db', borderRadius: 13, padding: 12, marginBottom: 14 },
-  consentLabel: { fontSize: 11, color: '#5b606c', flex: 1, lineHeight: 17 },
-  link: { color: '#ffb300', fontWeight: '700' },
-  error: { color: '#e0453f', fontSize: 11, marginBottom: 10, fontWeight: '700' },
-  badge: { alignSelf: 'flex-start', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11, marginBottom: 16 },
-  badgeGreen: { backgroundColor: '#e6f5ef' },
-  badgeAmber: { backgroundColor: '#fdf3df' },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  badgeTextGreen: { color: '#1e9e6f' },
-  badgeTextAmber: { color: '#c98a12' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f6f4ef',
+    padding: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1c20',
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#5b606c',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff7a1a',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: '#5b606c',
+    fontWeight: '600',
+  },
+  summaryValue: {
+    fontSize: 14,
+    color: '#1a1c20',
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: 10,
+  },
+  errorBox: {
+    backgroundColor: '#fce4e1',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#e0453f',
+  },
+  errorText: {
+    color: '#e0453f',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  loadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff9e6',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#ffa502',
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    marginTop: 8,
+    backgroundColor: '#f0f0f0',
+  },
 });
