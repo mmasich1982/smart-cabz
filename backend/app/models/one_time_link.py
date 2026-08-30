@@ -1,13 +1,12 @@
 # backend/app/models/one_time_link.py
 """
 OneTimeLink SQLAlchemy ORM Model
-Represents one-time use links for secure sharing and referrals
+CRITICAL: Do NOT use 'metadata' as attribute - it's reserved in SQLAlchemy!
 """
 
-from sqlalchemy import Column, String, DateTime, Integer, Boolean, Text, Enum as SQLEnum, Index, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Integer, Boolean, Text, Enum as SQLEnum, Index, JSON
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 import uuid
 
@@ -24,11 +23,11 @@ class LinkStatus(str, Enum):
 
 class OneTimeLink(Base):
     """
-    OneTimeLink Model
-    Represents a single-use link for secure sharing
+    OneTimeLink Model - One-time use links for secure sharing
     
-    CRITICAL: Do NOT use 'metadata' as an attribute name - it's reserved in SQLAlchemy!
-    Use 'link_metadata' or similar instead.
+    ⚠️ CRITICAL: 'metadata' is RESERVED in SQLAlchemy declarative base
+    Use 'link_metadata' instead to avoid:
+    "Attribute name 'metadata' is reserved for the MetaData instance"
     """
     __tablename__ = "one_time_links"
     
@@ -55,17 +54,15 @@ class OneTimeLink(Base):
     
     # Device and network binding
     device_fingerprint = Column(String(512), nullable=True)
-    created_from_ip = Column(String(45), nullable=True)  # IPv6 support
+    created_from_ip = Column(String(45), nullable=True)
     accessed_from_ip = Column(String(45), nullable=True)
     created_from_user_agent = Column(Text, nullable=True)
     
-    # IMPORTANT: Use 'link_metadata' NOT 'metadata' - metadata is reserved in SQLAlchemy!
-    link_metadata = Column(JSONB if 'postgresql' in str(Base.metadata.bind) else JSON, 
-                           default=dict, nullable=False)
+    # ✅ Use 'link_metadata' NOT 'metadata' - metadata is RESERVED!
+    link_metadata = Column(JSONB, default=dict, nullable=False)
     
     # Access log as JSON
-    access_log = Column(JSONB if 'postgresql' in str(Base.metadata.bind) else JSON, 
-                        default=list, nullable=False)
+    access_log = Column(JSONB, default=list, nullable=False)
     
     # Revocation
     revoked_at = Column(DateTime(timezone=True), nullable=True)
@@ -76,7 +73,6 @@ class OneTimeLink(Base):
     device_change_count = Column(Integer, default=0, nullable=False)
     ip_change_count = Column(Integer, default=0, nullable=False)
     
-    # Indexes for common queries
     __table_args__ = (
         Index('ix_one_time_links_token', 'token', unique=True),
         Index('ix_one_time_links_rider_id', 'rider_id'),
@@ -109,7 +105,6 @@ class OneTimeLink(Base):
         if ip_address:
             self.accessed_from_ip = ip_address
         
-        # Log access
         if not self.access_log:
             self.access_log = []
         
