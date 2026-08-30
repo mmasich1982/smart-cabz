@@ -21,7 +21,7 @@ import BikeProfileScreen from '../screens/onboarding/BikeProfileScreen';
 import MobileNumberScreen from '../screens/onboarding/MobileNumberScreen';
 import ProfileConfirmationScreen from '../screens/onboarding/ProfileConfirmationScreen';
 import CreatePinScreen from '../screens/onboarding/CreatePinScreen';
-import PinRecoveryScreen from '../screens/onboarding/PinRecoveryScreen';
+
 
 // ✅ LEGAL SCREENS (correct paths)
 import TermsOfServiceScreen from '../screens/settings/TermsOfServiceScreen';
