@@ -1,9 +1,10 @@
 # backend/app/routers/bike_profile.py
 # ✅ ENHANCED: Comprehensive bike profile validation with duplicate number plate detection
-# Provides clear error messages and helpful guidance to customers
+# ✅ FIXED: Database error handling for check-plate-uniqueness endpoint
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from datetime import datetime, timezone
 import logging
 
@@ -34,7 +35,9 @@ def get_fuel_types(db: Session = Depends(get_db)):
     Returns: [{code, display_name, description, sort_order}]
     """
     try:
-        fuel_types = db.query(FuelTypeMaster).filter_by(is_active=True).order_by(FuelTypeMaster.sort_order).all()
+        fuel_types = db.query(FuelTypeMaster).filter(
+            FuelTypeMaster.is_active == True
+        ).order_by(FuelTypeMaster.sort_order).all()
         
         return [
             {
@@ -66,6 +69,7 @@ def check_plate_uniqueness(number_plate: str, db: Session = Depends(get_db)):
     Provides real-time validation feedback for the bike profile screen.
     
     ✅ FIXED: Comprehensive error handling prevents 500 errors
+    ✅ FIXED: Improved database query with explicit column filters
     
     Returns:
     {
@@ -98,46 +102,51 @@ def check_plate_uniqueness(number_plate: str, db: Session = Depends(get_db)):
                 detail="Number plate must be between 5-12 characters. Format: KCA123A"
             )
         
-        # ✅ FIXED: Wrap database queries in try-catch to handle errors gracefully
+        # ✅ FIXED: Wrap database queries in try-catch with explicit query
         try:
-            # Check for exact match in bike profiles
+            # Check for exact match in bike profiles using explicit filter
             existing_bike = db.query(BikeProfile).filter(
-                BikeProfile.number_plate == cleaned_plate,
-                BikeProfile.is_active == True
+                and_(
+                    BikeProfile.number_plate == cleaned_plate,
+                    BikeProfile.is_active == True
+                )
             ).first()
             
             if existing_bike:
                 # Get the rider details for the message
+                rider_name = "another rider"
                 try:
-                    rider = db.query(Rider).get(existing_bike.rider_id)
-                    rider_name = rider.full_name if rider and rider.full_name else "another rider"
+                    rider = db.query(Rider).filter(Rider.id == existing_bike.rider_id).first()
+                    if rider and rider.full_name:
+                        rider_name = rider.full_name
                 except Exception as rider_err:
                     logger.warning(f"Could not fetch rider details for plate {cleaned_plate}: {rider_err}")
-                    rider_name = "another rider"
                 
                 return {
                     "exists": True,
                     "number_plate": cleaned_plate,
                     "message": f"This number plate is already registered to {rider_name}. Please check and re-enter if incorrect.",
                     "status": "duplicate",
-                    "registered_to": rider_name if rider else "Unknown",
+                    "registered_to": rider_name,
                     "registered_at": existing_bike.submitted_at.isoformat() if existing_bike.submitted_at else None
                 }
         except HTTPException:
             raise
         except Exception as db_err:
-            logger.error(f"Database error checking existing bikes for plate {cleaned_plate}: {str(db_err)}")
+            logger.error(f"Database error checking existing bikes for plate {cleaned_plate}: {str(db_err)}", exc_info=True)
             raise HTTPException(
                 status_code=500,
                 detail="Error checking plate availability. Please try again."
             )
         
-        # ✅ FIXED: Wrap duplicate case check in try-catch
+        # ✅ FIXED: Wrap duplicate case check in try-catch with improved query
         try:
             # Check if there's a duplicate case pending for this plate
             pending_case = db.query(DuplicatePlateCase).filter(
-                DuplicatePlateCase.number_plate == cleaned_plate,
-                DuplicatePlateCase.status == "pending_review"
+                and_(
+                    DuplicatePlateCase.number_plate == cleaned_plate,
+                    DuplicatePlateCase.status == "pending_review"
+                )
             ).first()
             
             if pending_case:
@@ -212,7 +221,7 @@ def submit_bike_profile(
     """
     
     # Verify rider exists
-    rider = db.query(Rider).get(rider_id)
+    rider = db.query(Rider).filter(Rider.id == rider_id).first()
     if not rider:
         raise HTTPException(
             status_code=404,
@@ -225,65 +234,97 @@ def submit_bike_profile(
     if len(cleaned_plate) < 5 or len(cleaned_plate) > 12:
         raise HTTPException(
             status_code=400,
-            detail="Number plate must be between 5-12 characters. Example: KCA123A"
+            detail="Number plate must be between 5-12 characters"
         )
     
-    # Check for duplicate BEFORE creation
-    duplicate_bike = db.query(BikeProfile).filter(
-        BikeProfile.number_plate == cleaned_plate,
-        BikeProfile.is_active == True
-    ).first()
-    
-    if duplicate_bike:
-        dup_rider = db.query(Rider).get(duplicate_bike.rider_id)
-        dup_rider_name = dup_rider.full_name if dup_rider else "Unknown"
-        
-        raise HTTPException(
-            status_code=409,
-            detail=f"Number plate '{cleaned_plate}' is already registered to {dup_rider_name}. "
-                   f"Please verify and use a different plate. Contact support if this is incorrect."
+    # Validate fuel type exists and is active
+    fuel_type = db.query(FuelTypeMaster).filter(
+        and_(
+            FuelTypeMaster.code == payload.fuel_type_code,
+            FuelTypeMaster.is_active == True
         )
-    
-    # Validate fuel type exists
-    fuel_type = db.query(FuelTypeMaster).filter_by(
-        code=payload.fuel_type_code,
-        is_active=True
     ).first()
     
     if not fuel_type:
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid fuel type: {payload.fuel_type_code}. Please select from available options."
+            detail=f"Invalid fuel type: {payload.fuel_type_code}"
         )
     
-    # Create bike profile
+    # Check for duplicate plate
     try:
-        bike_profile = BikeProfile(
-            rider_id=rider_id,
-            number_plate=cleaned_plate,
-            fuel_type_code=payload.fuel_type_code,
-            submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            sync_status="pending_sync",
-            is_active=True
-        )
-        db.add(bike_profile)
-        db.commit()
-        db.refresh(bike_profile)
+        existing_bike = db.query(BikeProfile).filter(
+            and_(
+                BikeProfile.number_plate == cleaned_plate,
+                BikeProfile.is_active == True,
+                BikeProfile.rider_id != rider_id  # Allow same rider to update
+            )
+        ).first()
         
-        # Check and resolve any duplicate issues (if any)
-        duplicate_result = check_and_resolve_duplicate(db, bike_profile)
-        
-        return {
-            "bike_profile_id": str(bike_profile.id),
-            "status": "success",
-            "message": f"Bike profile registered successfully with plate {cleaned_plate}",
-            "number_plate": cleaned_plate,
-            "fuel_type": payload.fuel_type_code,
-            "duplicate_detected": duplicate_result.get("duplicate_detected", False),
-            "duplicate_case_id": duplicate_result.get("case_id"),
-            "sync_status": bike_profile.sync_status
-        }
+        if existing_bike:
+            dup_rider = db.query(Rider).filter(Rider.id == existing_bike.rider_id).first()
+            dup_name = dup_rider.full_name if dup_rider else "another rider"
+            
+            raise HTTPException(
+                status_code=409,
+                detail=f"Number plate '{cleaned_plate}' is already registered to {dup_name}"
+            )
+    except HTTPException:
+        raise
+    except Exception as db_err:
+        logger.error(f"Database error checking duplicate plates: {str(db_err)}")
+        raise HTTPException(status_code=500, detail="Error validating bike profile")
     
+    # Create or update bike profile
+    try:
+        # Check if rider already has a bike profile
+        existing_profile = db.query(BikeProfile).filter(
+            BikeProfile.rider_id == rider_id
+        ).first()
+        
+        if existing_profile:
+            # Update existing profile
+            existing_profile.number_plate = cleaned_plate
+            existing_profile.fuel_type_code = payload.fuel_type_code
+            existing_profile.submitted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.commit()
+            db.refresh(existing_profile)
+            
+            return {
+                "bike_profile_id": str(existing_profile.id),
+                "status": "success",
+                "message": "Bike profile updated successfully",
+                "number_plate": cleaned_plate,
+                "fuel_type": payload.fuel_type_code,
+                "duplicate_detected": False
+            }
+        else:
+            # Create new profile
+            new_bike = BikeProfile(
+                rider_id=rider_id,
+                number_plate=cleaned_plate,
+                fuel_type_code=payload.fuel_type_code,
+                submitted_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                sync_status="pending",
+                is_active=True
+            )
+            db.add(new_bike)
+            db.commit()
+            db.refresh(new_bike)
+            
+            logger.info(f"Bike profile created for rider {rider_id}: {cleaned_plate}")
+            
+            return {
+                "bike_profile_id": str(new_bike.id),
+                "status": "success",
+                "message": "Bike profile submitted successfully",
+                "number_plate": cleaned_plate,
+                "fuel_type": payload.fuel_type_code,
+                "duplicate_detected": False
+            }
+    
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error submitting bike profile for rider {rider_id}: {str(e)}")
@@ -321,31 +362,41 @@ def get_bike_profile(
     
     Returns 404 if no profile found
     """
-    bike_profile = db.query(BikeProfile).filter_by(
-        rider_id=rider_id,
-        is_active=True
-    ).first()
-    
-    if not bike_profile:
-        raise HTTPException(
-            status_code=404,
-            detail="No bike profile found for this rider. Please complete registration."
-        )
-    
-    # Get fuel type display name
-    fuel_type = db.query(FuelTypeMaster).get(bike_profile.fuel_type_code)
-    fuel_display = fuel_type.display_name if fuel_type else bike_profile.fuel_type_code
-    
-    return {
-        "bike_profile_id": str(bike_profile.id),
-        "number_plate": bike_profile.number_plate,
-        "fuel_type": bike_profile.fuel_type_code,
-        "fuel_type_display": fuel_display,
-        "submitted_at": bike_profile.submitted_at.isoformat() if bike_profile.submitted_at else None,
-        "is_active": bike_profile.is_active,
-        "current_odometer_km": bike_profile.current_odometer_km or 0,
-        "battery_range_km": bike_profile.battery_range_km
-    }
+    try:
+        bike_profile = db.query(BikeProfile).filter(
+            and_(
+                BikeProfile.rider_id == rider_id,
+                BikeProfile.is_active == True
+            )
+        ).first()
+        
+        if not bike_profile:
+            raise HTTPException(
+                status_code=404,
+                detail="No bike profile found for this rider. Please complete registration."
+            )
+        
+        # Get fuel type display name
+        fuel_type = db.query(FuelTypeMaster).filter(
+            FuelTypeMaster.code == bike_profile.fuel_type_code
+        ).first()
+        fuel_display = fuel_type.display_name if fuel_type else bike_profile.fuel_type_code
+        
+        return {
+            "bike_profile_id": str(bike_profile.id),
+            "number_plate": bike_profile.number_plate,
+            "fuel_type": bike_profile.fuel_type_code,
+            "fuel_type_display": fuel_display,
+            "submitted_at": bike_profile.submitted_at.isoformat() if bike_profile.submitted_at else None,
+            "is_active": bike_profile.is_active,
+            "current_odometer_km": bike_profile.current_odometer_km or 0,
+            "battery_range_km": bike_profile.battery_range_km
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting bike profile for rider {rider_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve bike profile")
 
 
 # ============================================================================
@@ -371,9 +422,11 @@ def update_bike_profile(
     """
     
     # Get current profile
-    bike_profile = db.query(BikeProfile).filter_by(
-        rider_id=rider_id,
-        is_active=True
+    bike_profile = db.query(BikeProfile).filter(
+        and_(
+            BikeProfile.rider_id == rider_id,
+            BikeProfile.is_active == True
+        )
     ).first()
     
     if not bike_profile:
@@ -388,13 +441,15 @@ def update_bike_profile(
     # If changing plate, check for duplicates
     if cleaned_plate != bike_profile.number_plate:
         duplicate = db.query(BikeProfile).filter(
-            BikeProfile.number_plate == cleaned_plate,
-            BikeProfile.is_active == True,
-            BikeProfile.id != bike_profile.id  # Exclude current profile
+            and_(
+                BikeProfile.number_plate == cleaned_plate,
+                BikeProfile.is_active == True,
+                BikeProfile.id != bike_profile.id  # Exclude current profile
+            )
         ).first()
         
         if duplicate:
-            dup_rider = db.query(Rider).get(duplicate.rider_id)
+            dup_rider = db.query(Rider).filter(Rider.id == duplicate.rider_id).first()
             dup_name = dup_rider.full_name if dup_rider else "Unknown"
             
             raise HTTPException(
@@ -403,9 +458,11 @@ def update_bike_profile(
             )
     
     # Validate fuel type
-    fuel_type = db.query(FuelTypeMaster).filter_by(
-        code=payload.fuel_type_code,
-        is_active=True
+    fuel_type = db.query(FuelTypeMaster).filter(
+        and_(
+            FuelTypeMaster.code == payload.fuel_type_code,
+            FuelTypeMaster.is_active == True
+        )
     ).first()
     
     if not fuel_type:
@@ -457,16 +514,18 @@ def report_duplicate_plate(
     """
     
     # Verify rider exists
-    rider = db.query(Rider).get(rider_id)
+    rider = db.query(Rider).filter(Rider.id == rider_id).first()
     if not rider:
         raise HTTPException(status_code=404, detail="Rider not found")
     
     cleaned_plate = reported_plate.strip().upper()
     
     # Find the bike with this plate
-    bike = db.query(BikeProfile).filter_by(
-        number_plate=cleaned_plate,
-        is_active=True
+    bike = db.query(BikeProfile).filter(
+        and_(
+            BikeProfile.number_plate == cleaned_plate,
+            BikeProfile.is_active == True
+        )
     ).first()
     
     if not bike:
@@ -477,8 +536,8 @@ def report_duplicate_plate(
     
     # Create or update duplicate case
     try:
-        case = db.query(DuplicatePlateCase).filter_by(
-            number_plate=cleaned_plate
+        case = db.query(DuplicatePlateCase).filter(
+            DuplicatePlateCase.number_plate == cleaned_plate
         ).first()
         
         if not case:
