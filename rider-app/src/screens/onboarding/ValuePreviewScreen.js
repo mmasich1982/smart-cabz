@@ -55,7 +55,7 @@ export default function ValuePreviewScreen({ navigation }) {
   const earnedLabel = t('preview.earned_label') || 'Money earned';
   const costLabel = t('preview.cost_label') || 'Fuel & service';
   const netLabel = t('preview.net_label') || 'Money kept (profit)';
-  const hintText = t('preview.hint') || 'We work out these numbers for you, from your trips. No pen. No paper. No guessing.';
+  const hintText = t('preview.hint') || 'We work out these numbers for you, from your rides. No pen. No paper. No guessing.';
 
   const handleBack = () => {
     navigation.navigate('LanguageSelection');
