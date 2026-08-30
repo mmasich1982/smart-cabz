@@ -105,26 +105,43 @@ def get_rider_details(rider_id: str, db: Session = Depends(get_db)):
         
         logger.info(f"Retrieved rider details for {rider_id}: status={registration_status}, has_bike={bike_profile is not None}")
         
+        # ✅ FIXED: Ensure all fields needed by HomeScreen are included
         return {
             "ok": True,
+            "success": True,
             "rider": {
                 "rider_id": str(rider.id),
+                "id": str(rider.id),  # Include both formats for compatibility
                 "mobile_number": rider.mobile_number,
                 "full_name": full_name,
                 "registration_status": registration_status,
-                "onboarding_step": onboarding_step
+                "onboarding_step": onboarding_step,
+                "mobile_verified": getattr(rider, 'mobile_verified', False)
             },
             "bike_profile": {
                 "id": str(bike_profile.id) if bike_profile else None,
                 "number_plate": bike_profile.number_plate if bike_profile else None,
                 "fuel_type_code": bike_profile.fuel_type_code if bike_profile else None,
-                "is_active": bike_profile.is_active if bike_profile else None
-            } if bike_profile else None,
+                "is_active": bike_profile.is_active if bike_profile else True
+            } if bike_profile else {
+                "id": None,
+                "number_plate": None,
+                "fuel_type_code": None,
+                "is_active": False
+            },
             "account": {
+                "rider_id": str(rider.id),
+                "id": str(rider.id),
+                "mobile_number": rider.mobile_number,
+                "full_name": full_name,
+                "registration_status": registration_status,
+                "mobile_verified": getattr(rider, 'mobile_verified', False)
+            },
+            "data": {
                 "rider_id": str(rider.id),
                 "mobile_number": rider.mobile_number,
                 "full_name": full_name,
-                "registration_status": registration_status
+                "status": registration_status
             }
         }
     
