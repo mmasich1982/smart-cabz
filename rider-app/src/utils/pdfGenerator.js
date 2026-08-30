@@ -29,7 +29,7 @@ export async function generateStatementPDF(statement) {
     // Print to PDF
     await Print.printAsync({
       html: htmlContent,
-      fileName: `SmartBoda-Statement-${statement.id}`,
+      fileName: `SmartCabz-Statement-${statement.id}`,
     });
   } catch (err) {
     console.error('PDF generation error:', err);
@@ -53,7 +53,7 @@ export async function generateDetailedReportPDF(statement, transactions) {
 
     await Print.printAsync({
       html: htmlContent,
-      fileName: `SmartBoda-DetailedReport-${statement.id}`,
+      fileName: `SmartCabz-DetailedReport-${statement.id}`,
     });
   } catch (err) {
     console.error('Detailed report PDF error:', err);

@@ -1,6 +1,7 @@
 /**
  * financialHistoryConstants.js
  * Configuration constants for financial history and statement features
+ * ✅ FIXED: Updated all "SmartBoda" references to "SmartCabz"
  */
 
 // Statement purposes - predefined options for statement generation
@@ -95,8 +96,9 @@ export const CACHE_DURATIONS = {
 };
 
 // PDF generation configuration
+// ✅ FIXED: Updated filename format from SmartBoda to SmartCabz
 export const PDF_CONFIG = {
-  FILENAME_FORMAT: 'SmartBoda-Statement-{STATEMENT_ID}.pdf',
+  FILENAME_FORMAT: 'SmartCabz-Statement-{STATEMENT_ID}.pdf',
   PAGE_SIZE: 'A4',
   MARGINS: 14, // mm
   FONT_SIZE_TITLE: 15,

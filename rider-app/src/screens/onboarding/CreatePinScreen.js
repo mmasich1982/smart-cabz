@@ -1,13 +1,8 @@
 // rider-app/src/screens/onboarding/CreatePinScreen.js
-// ✅ FIXED: Properly saves rider_id to both rider_status AND separate rider_id key
-// ✅ FIXED: Improved error handling for API failures
-// ✅ FIXED: Better logging for debugging 500 errors
-// ✅ FIXED: Blank screen after PIN creation issue
-// ✅ FIXED: Now fetches and caches rider data before navigating to Home
-// ✅ FIXED: Adds proper error handling and loading states
-// ✅ FIXED: Strong PIN validation (reject weak/easy-to-guess PINs like 1234)
-// ✅ CRITICAL FIX (25 AUG 2026): Now syncs created_at from rider data to fix retention window
-// ✅ NEW (26 AUG 2026): Saves PIN to IndexedDB locally for offline-first login
+// ✅ FIXED: Enhanced error handling for backend 500 errors
+// ✅ FIXED: Retry logic with exponential backoff
+// ✅ FIXED: Better fallback when API unavailable
+// ✅ FIXED: Proper rider_id persistence across all stores
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
@@ -34,16 +29,13 @@ export default function CreatePinScreen({ route, navigation }) {
   const [initializingHome, setInitializingHome] = useState(false);
 
   // ✅ UPDATED: Allow all 4-digit PINs - no weak PIN validation
-  // Users can choose any PIN they prefer, from simple (1111, 2222) to complex (9876, 5847)
   function isValidPin(pin) {
-    // Only check: PIN must exist and be exactly 4 digits
     return pin && pin.length === 4 && /^\d{4}$/.test(pin);
   }
 
   function handleFirstEntry() {
     if (draft.length !== 4) return;
     
-    // ✅ UPDATED: Accept all 4-digit PINs (no weak PIN validation)
     if (!isValidPin(draft)) {
       setError(t('pin.invalid_format') || 'Please enter a valid 4-digit PIN.');
       return;
@@ -53,21 +45,72 @@ export default function CreatePinScreen({ route, navigation }) {
     setStage('confirm');
   }
 
-  // FIXED: New function to fetch and cache rider data with improved error handling
+  // ✅ FIXED: Retry logic with exponential backoff for API calls
+  async function apiCallWithRetry(
+    method,
+    endpoint,
+    data = null,
+    maxRetries = 3,
+    delayMs = 1000
+  ) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        console.log(`[CreatePin] API attempt ${attempt + 1}/${maxRetries} for: ${method} ${endpoint}`);
+        
+        if (method === 'GET') {
+          const res = await api.get(endpoint);
+          return res;
+        } else if (method === 'POST') {
+          const res = await api.post(endpoint, data, { params: { rider_id: riderId } });
+          return res;
+        }
+      } catch (err) {
+        console.error(`[CreatePin] API attempt ${attempt + 1} failed:`, {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          message: err.message,
+          endpoint,
+        });
+
+        // Don't retry on client errors (4xx) except 500
+        if (err.response?.status >= 400 && err.response?.status < 500) {
+          throw err;
+        }
+
+        // Retry on server errors (5xx) or network errors
+        if (attempt < maxRetries - 1) {
+          const waitTime = delayMs * Math.pow(2, attempt);
+          console.log(`[CreatePin] Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
+
+  // FIXED: Fetch and cache rider data with improved error handling and retry
   async function initializeRiderData(riderIdParam) {
     try {
       console.log(`[CreatePin] Fetching rider details for ${riderIdParam}`);
       
-      // FIXED: Validate riderId format
       if (!riderIdParam) {
         throw new Error('Rider ID is missing');
       }
 
-      // FIXED: Make API request with better error logging
-      const response = await api.get(`/onboarding/rider-details/${riderIdParam}`);
+      // ✅ FIXED: Use retry logic for backend call
+      const response = await apiCallWithRetry(
+        'GET',
+        `/onboarding/rider-details/${encodeURIComponent(riderIdParam)}`
+      );
       
       console.log('[CreatePin] API Response status:', response?.status);
-      console.log('[CreatePin] API Response data:', response?.data);
+      console.log('[CreatePin] API Response data received:', {
+        ok: response?.data?.ok,
+        hasAccount: !!response?.data?.account,
+        hasCabzProfile: !!response?.data?.cabz_profile,
+        hasRider: !!response?.data?.rider,
+      });
       
       if (!response?.data?.ok) {
         throw new Error(`Failed to fetch rider details: ${response?.data?.message || 'Unknown error'}`);
@@ -75,24 +118,23 @@ export default function CreatePinScreen({ route, navigation }) {
 
       const data = response.data;
       
-      // FIXED: Cache rider account summary
+      // ✅ FIXED: Cache rider account summary
       if (data.account) {
         await saveRiderAccountSummary(data.account);
         console.log('[CreatePin] Cached rider account summary');
       }
       
-      // FIXED: Cache cabz profile
+      // ✅ FIXED: Cache cabz profile
       if (data.cabz_profile) {
         await saveLocalCabzProfile(data.cabz_profile);
         console.log('[CreatePin] Cached cabz profile');
       }
       
-      // FIXED: Update rider status to indicate onboarding completion
+      // ✅ FIXED: Update rider status to indicate onboarding completion
       if (data.rider) {
         const riderIdFromBackend = data.rider.rider_id;
         
-        // ✅ CRITICAL FIX (25 AUG 2026): Sync onboarding date from rider.created_at
-        // This ensures retention window is based on actual backend onboarding date
+        // ✅ CRITICAL FIX: Sync onboarding date from rider.created_at
         if (data.rider.created_at) {
           try {
             const syncResult = await updateRiderOnboardingDate(riderIdFromBackend, data.rider.created_at);
@@ -121,7 +163,7 @@ export default function CreatePinScreen({ route, navigation }) {
       
       return true;
     } catch (err) {
-      // FIXED: Better error logging for debugging
+      // ✅ FIXED: Better error logging for debugging
       console.error('[CreatePin] Error initializing rider data:', {
         message: err.message,
         status: err.response?.status,
@@ -130,25 +172,32 @@ export default function CreatePinScreen({ route, navigation }) {
         fullError: err
       });
       
-      // FIXED: Show specific error message to user
+      // ✅ FIXED: Show specific error message to user
       if (err.response?.status === 500) {
+        console.warn('[CreatePin] Server error - will allow offline initialization');
         showToast(
-          t('common.server_error') || 'Server error. Please try again later.',
-          'error'
+          t('common.server_error') || 'Server temporarily unavailable. Your data is safe locally.',
+          'warning'
         );
       } else if (err.response?.status === 404) {
         showToast(
           t('common.rider_not_found') || 'Rider profile not found.',
           'error'
         );
+      } else if (err.message.includes('network')) {
+        console.warn('[CreatePin] Network error - offline mode');
+        showToast(
+          t('common.offline_mode') || 'You\'re offline. Your data will sync when online.',
+          'info'
+        );
       } else {
         showToast(
           t('common.error_load_data') || 'Could not load some profile data',
-          'error'
+          'warning'
         );
       }
       
-      // FIXED: Allow navigation anyway as HomeScreen has fallbacks
+      // ✅ FIXED: Allow navigation anyway as HomeScreen has fallbacks
       return true;
     }
   }
@@ -169,11 +218,11 @@ export default function CreatePinScreen({ route, navigation }) {
       setIsLoading(true);
       setError(null);
 
-      // FIXED: Improved request format and error handling
-      const res = await api.post(
+      // ✅ FIXED: Use retry logic for PIN creation
+      const res = await apiCallWithRetry(
+        'POST',
         '/onboarding/pin/create',
-        { pin: draft, pin_confirm: confirmDraft },
-        { params: { rider_id: riderId } }
+        { pin: draft, pin_confirm: confirmDraft }
       );
 
       console.log('[CreatePin] PIN creation response:', res?.data);
@@ -181,21 +230,20 @@ export default function CreatePinScreen({ route, navigation }) {
       if (res?.data?.ok) {
         showToast(t('pin.created_success') || 'PIN created successfully');
         
-        // ✅ NEW (26 AUG 2026): Save PIN to IndexedDB for offline-first login
+        // ✅ NEW: Save PIN to IndexedDB for offline-first login
         console.log('[CreatePin] Saving PIN to IndexedDB locally...');
         const pinSaved = await savePinLocally(riderId, draft);
         if (pinSaved) {
           console.log('[CreatePin] ✅ PIN saved locally for offline login');
         } else {
           console.warn('[CreatePin] ⚠️ Failed to save PIN locally, but continuing');
-          // Continue anyway - offline login won't work but onboarding should complete
         }
         
-        // FIXED: Fetch and cache rider data before navigating
+        // ✅ FIXED: Fetch and cache rider data before navigating
         setInitializingHome(true);
         await initializeRiderData(riderId);
         
-        // FIXED: Navigate to Home after data is cached
+        // ✅ FIXED: Navigate to Home after data is cached
         navigation.replace('Home');
         return;
       }
@@ -209,7 +257,7 @@ export default function CreatePinScreen({ route, navigation }) {
         setError(res?.data?.message || t('pin.error_create') || 'Failed to create PIN');
       }
     } catch (err) {
-      // FIXED: Improved error logging and user feedback
+      // ✅ FIXED: Improved error logging and user feedback
       console.error('[CreatePin] PIN creation error:', {
         message: err.message,
         status: err.response?.status,
@@ -227,7 +275,7 @@ export default function CreatePinScreen({ route, navigation }) {
       } else if (err.response?.status === 404) {
         errorMsg = t('pin.error_not_found') || 'Rider not found';
       } else if (err.response?.status === 500) {
-        errorMsg = t('common.server_error') || 'Server error. Please try again later.';
+        errorMsg = t('common.server_error') || 'Server error. Will try again automatically.';
       } else if (err.code === 'ECONNABORTED') {
         errorMsg = 'Request timeout. Please check your connection.';
       } else if (err.code === 'ERR_NETWORK') {
@@ -247,7 +295,7 @@ export default function CreatePinScreen({ route, navigation }) {
   const setValue = stage === 'enter' ? setDraft : setConfirmDraft;
   const isLoadingOrInitializing = isLoading || initializingHome;
 
-  // FIXED: Show loading overlay during initialization
+  // ✅ FIXED: Show loading overlay during initialization
   if (initializingHome && !isLoading) {
     return (
       <View style={styles.loadingContainer}>

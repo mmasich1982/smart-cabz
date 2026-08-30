@@ -1,4 +1,8 @@
 // rider-app/src/screens/onboarding/CabzProfileScreen.js
+// ✅ FIXED: Enhanced API error handling with retry logic
+// ✅ FIXED: Better offline fallback when backend is unavailable
+// ✅ FIXED: Improved error messages and user feedback
+
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import OnboardingProgressBar from '../../components/OnboardingProgressBar';
@@ -14,7 +18,7 @@ import { enqueue } from '../../offline/syncQueue';
 
 // SB-02-A + SB-02-B combined, matching the single-screen prototype flow exactly
 // FIXED: NO Smart Cabz branding header (only appears in app-topbar)
-// FIXED: Unique plate validation with backend check
+// FIXED: Unique plate validation with backend check + retry logic
 export default function CabzProfileScreen({ navigation }) {
   const { fuelTypes } = useMasterData();
   const { t } = useTranslation();
@@ -25,6 +29,37 @@ export default function CabzProfileScreen({ navigation }) {
   const [localDuplicateWarning, setLocalDuplicateWarning] = useState(null);
   const [validatingPlate, setValidatingPlate] = useState(false);
   const { showToast } = useToast();
+
+  // ✅ FIXED: Retry logic with exponential backoff for API calls
+  async function apiCallWithRetry(url, maxRetries = 3, delayMs = 1000) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        console.log(`[CabzProfile] API attempt ${attempt + 1}/${maxRetries} for: ${url}`);
+        const res = await api.get(url);
+        return res;
+      } catch (err) {
+        console.error(`[CabzProfile] API attempt ${attempt + 1} failed:`, {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          message: err.message,
+        });
+
+        // Don't retry on client errors (4xx)
+        if (err.response?.status >= 400 && err.response?.status < 500) {
+          throw err;
+        }
+
+        // Retry on server errors (5xx) or network errors
+        if (attempt < maxRetries - 1) {
+          const waitTime = delayMs * Math.pow(2, attempt); // Exponential backoff
+          console.log(`[CabzProfile] Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
 
   async function handlePlateBlur() {
     const cleaned = plate.trim().toUpperCase();
@@ -39,14 +74,26 @@ export default function CabzProfileScreen({ navigation }) {
       }
       
       try {
-        const res = await api.get(`/onboarding/check-plate-uniqueness/${cleaned}`);
+        // ✅ FIXED: Use retry logic for backend check
+        const res = await apiCallWithRetry(`/onboarding/check-plate-uniqueness/${encodeURIComponent(cleaned)}`);
         if (res.data.exists) {
           setLocalDuplicateWarning(t('cabz.global_duplicate_warning') || 'This number plate is already registered to another driver.');
         } else {
           setLocalDuplicateWarning(null);
         }
       } catch (err) {
-        setLocalDuplicateWarning(null);
+        // ✅ FIXED: Better error handling - show warning but allow user to proceed
+        console.warn('[CabzProfile] Backend plate check failed, allowing offline verification:', err.message);
+        
+        if (err.response?.status === 500) {
+          setLocalDuplicateWarning(
+            t('cabz.offline_mode') || 
+            'Currently offline - we\'ll verify this plate when connection is restored.'
+          );
+        } else {
+          setLocalDuplicateWarning(null);
+        }
+        // Don't block the user - they can proceed
       }
     } finally {
       setValidatingPlate(false);

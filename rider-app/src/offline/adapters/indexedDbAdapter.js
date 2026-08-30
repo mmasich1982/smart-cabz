@@ -43,7 +43,7 @@
  * ============================================================================
  */
 
-const DB_NAME = 'SmartBodaOfflineDB';
+const DB_NAME = 'SmartCabzOfflineDB';
 const DB_VERSION = 4; // Incremented: schema fix for riderId index consistency
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 100; // milliseconds
