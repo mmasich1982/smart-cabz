@@ -1,9 +1,10 @@
 # backend/app/routers/mobile_number.py
 # ✅ ENHANCED: Comprehensive mobile number validation with duplicate detection
-# Provides clear error messages and guidance to customers
+# ✅ FIXED: consent_content_version is now optional with automatic fallback
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from datetime import datetime, timezone
 import logging
 import re
@@ -20,6 +21,9 @@ router = APIRouter(prefix="/onboarding", tags=["Mobile Number"])
 VALID_MOBILE_PATTERNS = [
     r'^(\+254|0)(7|1)[0-9]{8}$',  # Kenya format: +254712345678 or 0712345678
 ]
+
+# Default consent version for fallback
+DEFAULT_CONSENT_VERSION = "1.0"
 
 
 # ============================================================================
@@ -104,7 +108,9 @@ def check_mobile_uniqueness(mobile_number: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=error_msg)
     
     # Check if mobile exists
-    existing_rider = db.query(Rider).filter_by(mobile_number=normalized).first()
+    existing_rider = db.query(Rider).filter(
+        Rider.mobile_number == normalized
+    ).first()
     
     if existing_rider:
         if existing_rider.mobile_verified:
@@ -187,33 +193,35 @@ def submit_mobile_number(
             detail=f"Invalid mobile format: {error_msg}"
         )
     
-    # Check if mobile is already registered
-    existing_rider = db.query(Rider).filter_by(mobile_number=normalized).first()
-    
-    if existing_rider:
-        if existing_rider.mobile_verified:
-            # Phone verified to another account - block registration
-            rider_name = existing_rider.full_name or "Another rider"
-            raise HTTPException(
-                status_code=409,
-                detail=f"This number is already registered to {rider_name}. "
-                       f"Please use a different number or login if this is your account. "
-                       f"Contact support if you believe this is an error."
-            )
-        else:
-            # Pending registration - allow user to continue/retry
-            logger.info(f"Rider {existing_rider.id} restarting registration with mobile {normalized}")
-            return {
-                "rider_id": str(existing_rider.id),
-                "status": "continuing_registration",
-                "message": "Welcome back! Let's continue your registration.",
-                "mobile_number": normalized,
-                "formatted_mobile": normalized[3:],
-                "action": "proceed_to_next_step"
-            }
-    
-    # Create new rider with pending status
     try:
+        # Check if mobile is already registered
+        existing_rider = db.query(Rider).filter(
+            Rider.mobile_number == normalized
+        ).first()
+        
+        if existing_rider:
+            if existing_rider.mobile_verified:
+                # Phone verified to another account - block registration
+                rider_name = existing_rider.full_name or "Another rider"
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"This number is already registered to {rider_name}. "
+                           f"Please use a different number or login if this is your account. "
+                           f"Contact support if you believe this is an error."
+                )
+            else:
+                # Pending registration - allow user to continue/retry
+                logger.info(f"Rider {existing_rider.id} restarting registration with mobile {normalized}")
+                return {
+                    "rider_id": str(existing_rider.id),
+                    "status": "continuing_registration",
+                    "message": "Welcome back! Let's continue your registration.",
+                    "mobile_number": normalized,
+                    "formatted_mobile": normalized[3:],
+                    "action": "proceed_to_next_step"
+                }
+        
+        # Create new rider with pending status
         new_rider = Rider(
             mobile_number=normalized,
             mobile_verified=False,
@@ -225,46 +233,51 @@ def submit_mobile_number(
         db.commit()
         db.refresh(new_rider)
         
-        logger.info(f"New rider {new_rider.id} registered with mobile {normalized}")
+        logger.info(f"New rider created with mobile {normalized}: {new_rider.id}")
         
         return {
             "rider_id": str(new_rider.id),
             "status": "new_registration",
-            "message": f"Mobile number registered successfully. A verification OTP will be sent to {normalized}",
+            "message": "Great! Now let's set up your profile.",
             "mobile_number": normalized,
             "formatted_mobile": normalized[3:],
-            "action": "proceed_to_verification"  # This will lead to OTP verification when implemented
+            "action": "proceed_to_next_step"
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error submitting mobile number: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to register mobile number. Please try again or contact support."
+            detail="Failed to process mobile number. Please try again."
         )
 
 
 # ============================================================================
-# ENDPOINT: Confirm Rider Profile (Name & Consent)
+# ENDPOINT: Confirm Profile (Second Registration Step)
 # ============================================================================
 
 @router.post("/profile-confirm")
-def profile_confirm(
-    payload: ProfileConfirmRequest,
+def confirm_profile(
     rider_id: str = Query(..., description="Rider UUID"),
+    payload: ProfileConfirmRequest = None,
     db: Session = Depends(get_db)
 ):
     """
     POST /onboarding/profile-confirm?rider_id=UUID
     
-    Confirm rider profile with full name and consent acceptance.
+    Confirm rider profile with full name and consent.
     
-    Validation:
-    - Rider must exist
-    - Full name must be provided (not empty/whitespace)
-    - Consent must be accepted
-    - Full name must not already be registered to another verified rider
+    Request body:
+    {
+        "full_name": "John Doe",
+        "consent_accepted": true,
+        "consent_content_version": "1.0"  # Optional - will use default if not provided
+    }
+    
+    ✅ FIXED: consent_content_version is now optional
     
     Returns:
     {
@@ -282,65 +295,77 @@ def profile_confirm(
     - 500: Database error
     """
     
-    # Validate consent first
-    if not payload.consent_accepted:
+    # Handle both direct parameter and payload
+    if payload is None:
         raise HTTPException(
             status_code=422,
-            detail="You must accept the terms and conditions to proceed. "
-                   "Please read and check the consent box.",
-            headers={"X-Error-Code": "CONSENT_REQUIRED"}
+            detail="Request body is required with full_name, consent_accepted, and optionally consent_content_version"
         )
     
-    # Check if rider exists
-    rider = db.query(Rider).get(rider_id)
-    if not rider:
-        raise HTTPException(
-            status_code=404,
-            detail="Rider account not found. Please start registration from the beginning."
-        )
-    
-    # Validate full name is provided
-    if not payload.full_name or not payload.full_name.strip():
-        raise HTTPException(
-            status_code=422,
-            detail="Full name is required. Please enter your complete name.",
-            headers={"X-Error-Code": "FULL_NAME_REQUIRED"}
-        )
-    
-    # Normalize full name
-    full_name_clean = payload.full_name.strip()
-    
-    # Validate name length
-    if len(full_name_clean) < 2 or len(full_name_clean) > 80:
-        raise HTTPException(
-            status_code=422,
-            detail="Full name must be between 2-80 characters.",
-            headers={"X-Error-Code": "FULL_NAME_INVALID"}
-        )
-    
-    # Check if full name is already registered by another VERIFIED rider
-    # Only check verified riders to avoid conflicts with other pending registrations
-    existing_rider_with_name = db.query(Rider).filter(
-        Rider.full_name == full_name_clean,
-        Rider.id != rider_id,
-        Rider.mobile_verified == True  # Only check verified accounts
-    ).first()
-    
-    if existing_rider_with_name:
-        # Full name conflict with another verified account
-        raise HTTPException(
-            status_code=409,
-            detail="This full name is already registered to a verified account. "
-                   f"Please verify your details and enter the correct name. "
-                   f"Contact support if you believe this is an error.",
-            headers={"X-Error-Code": "FULL_NAME_EXISTS"}
-        )
-    
-    # Update rider profile
     try:
+        # Validate consent first
+        if not payload.consent_accepted:
+            raise HTTPException(
+                status_code=422,
+                detail="You must accept the terms and conditions to proceed. "
+                       "Please read and check the consent box.",
+                headers={"X-Error-Code": "CONSENT_REQUIRED"}
+            )
+        
+        # Check if rider exists
+        rider = db.query(Rider).filter(Rider.id == rider_id).first()
+        if not rider:
+            raise HTTPException(
+                status_code=404,
+                detail="Rider account not found. Please start registration from the beginning."
+            )
+        
+        # Validate full name is provided
+        if not payload.full_name or not payload.full_name.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Full name is required. Please enter your complete name.",
+                headers={"X-Error-Code": "FULL_NAME_REQUIRED"}
+            )
+        
+        # Normalize full name
+        full_name_clean = payload.full_name.strip()
+        
+        # Validate name length
+        if len(full_name_clean) < 2 or len(full_name_clean) > 80:
+            raise HTTPException(
+                status_code=422,
+                detail="Full name must be between 2-80 characters.",
+                headers={"X-Error-Code": "FULL_NAME_INVALID"}
+            )
+        
+        # Check if full name is already registered by another VERIFIED rider
+        # Only check verified riders to avoid conflicts with other pending registrations
+        existing_rider_with_name = db.query(Rider).filter(
+            and_(
+                Rider.full_name == full_name_clean,
+                Rider.id != rider_id,
+                Rider.mobile_verified == True  # Only check verified accounts
+            )
+        ).first()
+        
+        if existing_rider_with_name:
+            # Full name conflict with another verified account
+            raise HTTPException(
+                status_code=409,
+                detail="This full name is already registered to a verified account. "
+                       f"Please verify your details and enter the correct name. "
+                       f"Contact support if you believe this is an error.",
+                headers={"X-Error-Code": "FULL_NAME_EXISTS"}
+            )
+        
+        # ✅ FIXED: Use provided consent_content_version or fall back to default
+        consent_version = payload.consent_content_version if payload.consent_content_version else DEFAULT_CONSENT_VERSION
+        
+        # Update rider profile
         rider.full_name = full_name_clean
         rider.consent_accepted_at = datetime.now(timezone.utc).replace(tzinfo=None)
-        rider.consent_content_version = payload.consent_content_version
+        rider.consent_content_version = consent_version
         rider.registration_status = "verified_incomplete"  # Mobile verified but PIN not yet created
         rider.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
@@ -359,9 +384,11 @@ def profile_confirm(
             "progress": "2/5"  # Show registration progress
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error confirming profile for rider {rider_id}: {str(e)}")
+        logger.error(f"Error confirming profile for rider {rider_id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Failed to save your profile. Please try again or contact support.",
@@ -394,7 +421,7 @@ def get_mobile_details(
     }
     """
     
-    rider = db.query(Rider).get(rider_id)
+    rider = db.query(Rider).filter(Rider.id == rider_id).first()
     if not rider:
         raise HTTPException(status_code=404, detail="Rider not found")
     
@@ -443,32 +470,34 @@ def update_mobile_number(
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_msg)
     
-    # Get rider
-    rider = db.query(Rider).get(rider_id)
-    if not rider:
-        raise HTTPException(status_code=404, detail="Rider not found")
-    
-    # Can only update if not yet verified
-    if rider.mobile_verified:
-        raise HTTPException(
-            status_code=403,
-            detail="Cannot update a verified mobile number. Contact support if you need assistance."
-        )
-    
-    # Check new mobile isn't already in use
-    existing = db.query(Rider).filter(
-        Rider.mobile_number == normalized,
-        Rider.id != rider_id
-    ).first()
-    
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Mobile number {normalized} is already in use. Please use a different number."
-        )
-    
-    # Update mobile number
     try:
+        # Get rider
+        rider = db.query(Rider).filter(Rider.id == rider_id).first()
+        if not rider:
+            raise HTTPException(status_code=404, detail="Rider not found")
+        
+        # Can only update if not yet verified
+        if rider.mobile_verified:
+            raise HTTPException(
+                status_code=403,
+                detail="Cannot update a verified mobile number. Contact support if you need assistance."
+            )
+        
+        # Check new mobile isn't already in use
+        existing = db.query(Rider).filter(
+            and_(
+                Rider.mobile_number == normalized,
+                Rider.id != rider_id
+            )
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Mobile number {normalized} is already in use. Please use a different number."
+            )
+        
+        # Update mobile number
         old_mobile = rider.mobile_number
         rider.mobile_number = normalized
         rider.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -484,6 +513,8 @@ def update_mobile_number(
             "formatted": normalized[3:]
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating mobile for rider {rider_id}: {str(e)}")

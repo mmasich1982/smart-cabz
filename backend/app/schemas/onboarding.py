@@ -1,6 +1,6 @@
 # backend/app/schemas/onboarding.py
 # ✓ VERIFIED: Already using Pydantic V2 syntax (field_validator, ConfigDict)
-# No changes needed - file is correctly implemented
+# ✅ FIXED: consent_content_version is now optional with default fallback
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
@@ -37,10 +37,18 @@ class MobileNumberRequest(BaseModel):
         return v
 
 class ProfileConfirmRequest(BaseModel):
+    """
+    ✅ FIXED: consent_content_version is now Optional with default
+    
+    Client can send:
+    - With explicit version: {"full_name": "...", "consent_accepted": true, "consent_content_version": "1.0"}
+    - Without version: {"full_name": "...", "consent_accepted": true}
+      (backend will use default "1.0")
+    """
     device_id: Optional[str] = None
     full_name: str = Field(..., max_length=80, min_length=1)
     consent_accepted: bool
-    consent_content_version: str
+    consent_content_version: Optional[str] = Field(default=None, description="Optional - defaults to 1.0 if not provided")
 
 class PinCreateRequest(BaseModel):
     device_id: Optional[str] = None
