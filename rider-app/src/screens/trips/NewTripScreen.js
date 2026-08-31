@@ -195,6 +195,7 @@ export default function NewTripScreen({ navigation }) {
         createdAt: now,
         date: new Date().toISOString().split('T')[0],
         created_at: new Date().toISOString(),
+        fare_amount: amtValue,
       };
 
       console.log('💾 Saving trip entry:', {
@@ -241,7 +242,10 @@ export default function NewTripScreen({ navigation }) {
           if (response.status === 200 || response.status === 201) {
             console.log('✅ Synced successfully to API');
             // Success - show brief confirmation
-            setSuccessMessage(t('success_tripRecorded') || `Trip saved! Today's total: KSh ${amtValue.toLocaleString()}.`);
+            setSuccessMessage(
+              t('success_tripRecorded') || 
+              `Trip saved! Today's total: KSh ${amtValue.toLocaleString()}.`
+            );
 
             // Reset form and navigate after brief success message
             // HomeScreen will refresh on focus via useFocusEffect
@@ -253,17 +257,39 @@ export default function NewTripScreen({ navigation }) {
             return;
           }
         } catch (apiErr) {
-          console.warn('⚠️ API sync failed (will retry later):', {
-            status: apiErr.response?.status,
-            message: apiErr.message,
+          // ✅ IMPROVED ERROR HANDLING: Handle 500 errors gracefully
+          const status = apiErr.response?.status;
+          const errorMsg = apiErr.response?.data?.message || apiErr.message;
+          
+          console.warn('⚠️ API sync error (trip data is safe locally):', {
+            status,
+            message: errorMsg,
+            endpoint: `/trips?rider_id=${effectiveRiderId}`,
           });
+
+          // Log specific error types for debugging
+          if (status === 500) {
+            console.error('❌ Server Error (500): API encountered an internal error');
+            console.error('   Trip has been saved locally and will sync when server recovers');
+          } else if (status === 400 || status === 422) {
+            console.error('❌ Validation Error:', errorMsg);
+          } else if (status === 401 || status === 403) {
+            console.error('❌ Authorization Error: Rider may not be authenticated');
+          } else {
+            console.error('❌ Network/API Error:', status, errorMsg);
+          }
+          
           // API failed but data is saved and queued - that's okay
+          // Continue to show success message since local save succeeded
         }
       }
 
       // Either offline or API sync failed - but data is safely stored in IndexedDB
       // Show success and navigate - HomeScreen will read from cache on focus
-      setSuccessMessage(t('success_tripSaving') || 'Trip saved. Syncing...');
+      // ✅ IMPROVED: Use better fallback message with caching hint
+      const successMsg = t('success_tripSaving') || 
+                        'Trip saved! Will sync when online.';
+      setSuccessMessage(successMsg);
 
       setTimeout(() => {
         setAmount('');
@@ -271,7 +297,10 @@ export default function NewTripScreen({ navigation }) {
         navigation.navigate('Home', { refreshFare: true });
       }, 800);
     } catch (err) {
-      console.error('❌ Save error:', err);
+      console.error('❌ Save error:', {
+        message: err.message,
+        stack: err.stack,
+      });
       showCriticalError(
         err.message || 'Error saving trip. Please try again.',
         'error'
